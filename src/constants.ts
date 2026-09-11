@@ -1,14 +1,43 @@
-export const WIDTH = 480;
-export const HEIGHT = 256;
-export const CENTER_X = WIDTH / 2;
-export const CENTER_Y = HEIGHT / 2;
-export const PLAYER_ACCELERATION = 0.0015;
-export const PLAYER_DECCELERATION = 0.002;
-export const PLAYER_MAX_SPEED = 0.12;
-export const PLAYER_JUMP_POWER = 0.18;
-export const GRAVITY = 0.001;
-export const FLOATY_GRAVITY = 0.0004;
-export const TILEMAP_WIDTH = 128;
-export const TILEMAP_HEIGHT = 16;
-export const TILE_SIZE = 16;
-export const HALF_TILE_SIZE = TILE_SIZE / 2;
+export const RAINBOW = [0xe40404, 0xff8200, 0xf1e300, 0x08ba00, 0x0030e2, 0x6c00ef, 0xa656ff];
+
+export const ROAD_HALF = 6.3;
+export const LIP = 6.15;
+export const CONCAVE = 2.1;
+export const BANDS = 7;
+
+export const ACCEL = 28;
+export const BRAKE = 36;
+export const DRAG = 0.85;
+export const MAX_SPEED = 34;
+export const MAX_REV = 8;
+export const STEER = 0.88;
+export const SLIDE_STEER = 2.4;
+export const SLIDE_HOOK = 0.3;
+export const SLIDE_SLIP = 1.05;
+export const SLIDE_KICK = 0.58;
+export const GRIP_FOLLOW = 12;
+export const EXIT_ALIGN = 3.4;
+export const SLIDE_BOOST = 6;
+export const SLIDE_TIME = 2.4;
+export const JUMP_VEL = 9.5;
+export const HOP_GRAV = 32;
+
+export const FALL_TIME = 1.05;
+export const PENALTY = 2;
+export const LAPS = 2;
+export const COUNTDOWN = 3;
+
+export const CAM_FOV = 1.05;
+export const CAM_BACK = 8.6;
+export const CAM_HEIGHT = 4.4;
+export const CAM_LOOK = 10;
+export const CAM_LOOK_Y = 0.9;
+export const CAM_LIFT = 18;
+
+export const SKY_R = 0.12;
+export const SKY_G = 0.08;
+export const SKY_B = 0.2;
+
+export const FONT = 'Segoe UI, system-ui, sans-serif';
+export const GHOST_HZ = 7;
+export const GHOST_ALPHA = 0.42;

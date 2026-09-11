@@ -1,5 +1,5 @@
 {
-  "name": "js13k-starter",
+  "name": "unicarn",
   "type": "module",
   "version": "0.0.3",
   "license": "MIT",
@@ -9,7 +9,9 @@
     "build": "tsc && vite build",
     "fix": "biome check --write --unsafe .",
     "preview": "vite preview",
-    "lint": "biome lint ."
+    "lint": "biome lint .",
+    "seed": "node tools/ladder-seed.mjs",
+    "postinstall": "node tools/ensure-bins.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.8",

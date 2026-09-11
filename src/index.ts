@@ -1,255 +1,228 @@
 import {
-  FLOATY_GRAVITY,
-  GRAVITY,
-  HALF_TILE_SIZE,
-  HEIGHT,
-  PLAYER_ACCELERATION,
-  PLAYER_JUMP_POWER,
-  PLAYER_MAX_SPEED,
-  TILE_SIZE,
-  TILEMAP_HEIGHT,
-  TILEMAP_WIDTH,
-  WIDTH,
+  CAM_BACK,
+  CAM_HEIGHT,
+  CAM_LOOK,
+  CAM_LOOK_Y,
+  SKY_B,
+  SKY_G,
+  SKY_R,
 } from './constants';
+import { ghostAt, ghostClock, hasGhost, recordTick, type Sample } from './ghost';
+import { beginFrame, initGl, resizeGl, setSky } from './gl';
+import { clearFrameInput, initInput, wasPressed } from './input';
+import { initLadder } from './ladder';
+import { lookAt, mat4 } from './math';
+import { type Frame } from './path';
 import {
-  ENTITY_TYPE_COIN,
-  ENTITY_TYPE_JUMPPAD,
-  ENTITY_TYPE_PLAYER,
-  ENTITY_TYPE_WALKING_ENEMY,
-  entities,
-} from './entity';
-import { initKeys, KEY_A, KEY_D, KEY_LEFT, KEY_RIGHT, KEY_Z, keys, updateKeys } from './keys';
-import { initMouse, updateMouse } from './mouse';
-import { coinSound, hurtSound, jumpPadSound, jumpSound } from './sounds';
-import { collisionDetectionEntityToTile, getTile, initTileMap } from './tilemap';
-import { zzfx } from './zzfx';
+  countdown,
+  falling,
+  fwd,
+  ghostPose,
+  heading,
+  idleTitle,
+  pose,
+  resetPlayer,
+  right,
+  s,
+  slip,
+  syncPose,
+  up,
+  updatePlayer,
+  vel,
+  velR,
+  velU,
+  wheel,
+  x,
+} from './player';
+import { drawRoad } from './road';
+import { loadSave } from './save';
+import { drawSparks } from './sparks';
+import { drawStars } from './stars';
+import {
+  drawUi,
+  handleMenuKey,
+  handleTap,
+  pauseGame,
+  resumeGame,
+  SCENE_PAUSE,
+  SCENE_RUN,
+  SCENE_TITLE,
+  scene,
+  setViewSize,
+  tickFinish,
+} from './ui';
+import { drawUnicarn } from './unicarn';
 
 const canvas = document.querySelector('#c') as HTMLCanvasElement;
-const ctx = canvas.getContext('2d') as CanvasRenderingContext2D;
+const uiCanvas = document.querySelector('#u') as HTMLCanvasElement;
+const ui = uiCanvas.getContext('2d') as CanvasRenderingContext2D;
+const view = mat4();
+const gPose: Frame = {
+  s: 0,
+  x: 0,
+  y: 0,
+  z: 0,
+  tx: 0,
+  ty: 0,
+  tz: 0,
+  nx: 0,
+  ny: 0,
+  nz: 0,
+  ux: 0,
+  uy: 0,
+  uz: 0,
+};
+const gF = [0, 0, 1];
+const gN = [1, 0, 0];
+const gU = [0, 1, 0];
+const gSamp: Sample = { t: 0, s: 0, x: 0, h: 0 };
 
-const skyGradient = ctx.createLinearGradient(0, 0, 0, HEIGHT);
-skyGradient.addColorStop(0, '#dff6f5');
-skyGradient.addColorStop(1, '#a4c6f1');
+let last = 0;
 
-const image = new Image();
-image.src = 'i.png';
-
-const player = initTileMap();
-
-let windowTime = 0;
-let dt = 0;
-let gameTime = 0;
-let score = 0;
-let viewportX = 0;
-
-initKeys(canvas);
-initMouse(canvas);
-
-function gameLoop(newTime: number): void {
-  requestAnimationFrame(gameLoop);
-
-  if (player.health > 0) {
-    dt = Math.min(newTime - windowTime, 1000 / 30);
-    gameTime += dt;
-
-    updateKeys();
-    updateMouse();
-    handleInput();
-    updateEntities();
-    collisionDetection();
-    updateCamera();
+function viewSize(): { w: number; h: number } {
+  const vv = window.visualViewport;
+  if (vv) {
+    return { w: vv.width, h: vv.height };
   }
-
-  render();
-  windowTime = newTime;
-  dt = 0;
+  return { w: window.innerWidth, h: window.innerHeight };
 }
 
-function handleInput(): void {
-  if (keys[KEY_LEFT].down || keys[KEY_A].down) {
-    player.dx -= dt * PLAYER_ACCELERATION;
-    player.direction = -1;
-  } else if (keys[KEY_RIGHT].down || keys[KEY_D].down) {
-    player.dx += dt * PLAYER_ACCELERATION;
-    player.direction = 1;
+function resize(): void {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const { w, h } = viewSize();
+  for (const el of [canvas, uiCanvas]) {
+    el.width = (w * dpr) | 0;
+    el.height = (h * dpr) | 0;
+    el.style.width = w + 'px';
+    el.style.height = h + 'px';
+  }
+  resizeGl(canvas.width, canvas.height);
+  ui.setTransform(dpr, 0, 0, dpr, 0, 0);
+  setViewSize(w, h);
+}
+
+function renderWorld(): void {
+  if (scene === SCENE_TITLE) {
+    idleTitle();
   } else {
-    player.dx = 0;
+    syncPose();
   }
-
-  if (keys[KEY_Z].downCount === 1 && player.grounded) {
-    player.dy = -PLAYER_JUMP_POWER;
-    zzfx(...jumpSound);
+  const px = pose.x;
+  const py = pose.y;
+  const pz = pose.z;
+  const onTitle = scene === SCENE_TITLE;
+  const tx = onTitle ? fwd[0] : vel[0];
+  const ty = falling > 0 ? 0 : onTitle ? fwd[1] : vel[1];
+  const tz = onTitle ? fwd[2] : vel[2];
+  const fl = Math.hypot(tx, ty, tz) || 1;
+  const fx = tx / fl;
+  const fy = ty / fl;
+  const fz = tz / fl;
+  const ux = falling > 0 ? 0 : onTitle ? up[0] : velU[0];
+  const uy = falling > 0 ? 1 : onTitle ? up[1] : velU[1];
+  const uz = falling > 0 ? 0 : onTitle ? up[2] : velU[2];
+  const sx = onTitle ? right[0] : velR[0];
+  const sy = onTitle ? right[1] : velR[1];
+  const sz = onTitle ? right[2] : velR[2];
+  const side = onTitle ? 3.2 : -slip * 2.6;
+  lookAt(
+    view,
+    px - fx * CAM_BACK + ux * CAM_HEIGHT + sx * side,
+    py - fy * CAM_BACK + uy * CAM_HEIGHT + sy * side,
+    pz - fz * CAM_BACK + uz * CAM_HEIGHT + sz * side,
+    px + fx * CAM_LOOK + ux * CAM_LOOK_Y,
+    py + fy * CAM_LOOK + uy * CAM_LOOK_Y,
+    pz + fz * CAM_LOOK + uz * CAM_LOOK_Y,
+    ux,
+    uy,
+    uz
+  );
+  beginFrame();
+  drawStars(view);
+  drawRoad(view);
+  if ((scene === SCENE_RUN || scene === SCENE_PAUSE) && hasGhost() && ghostAt(ghostClock(), gSamp)) {
+    ghostPose(gSamp.s, gSamp.x, gSamp.h, gPose, gF, gN, gU);
+    drawUnicarn(
+      view,
+      gPose.x,
+      gPose.y,
+      gPose.z,
+      gN[0],
+      gN[1],
+      gN[2],
+      gU[0],
+      gU[1],
+      gU[2],
+      gF[0],
+      gF[1],
+      gF[2],
+      gSamp.s * 2,
+      0,
+      true
+    );
   }
-
-  if (player.dx > PLAYER_MAX_SPEED) {
-    player.dx = PLAYER_MAX_SPEED;
-  } else if (player.dx < -PLAYER_MAX_SPEED) {
-    player.dx = -PLAYER_MAX_SPEED;
-  }
+  drawUnicarn(
+    view,
+    pose.x,
+    pose.y,
+    pose.z,
+    right[0],
+    right[1],
+    right[2],
+    up[0],
+    up[1],
+    up[2],
+    fwd[0],
+    fwd[1],
+    fwd[2],
+    wheel,
+    slip,
+    false
+  );
+  drawSparks(view);
 }
 
-function updateEntities(): void {
-  for (let i = entities.length - 1; i >= 0; i--) {
-    const entity = entities[i];
-
-    if (entity === player && keys[KEY_Z].down) {
-      player.dy += dt * FLOATY_GRAVITY;
-    } else if (entity.entityType !== ENTITY_TYPE_COIN) {
-      entity.dy += dt * GRAVITY;
-    }
-
-    if (entity.entityType === ENTITY_TYPE_WALKING_ENEMY) {
-      entity.dx = entity.direction * 0.03;
-    }
-
-    entity.x += dt * entity.dx;
-    entity.y += dt * entity.dy;
-    entity.cooldown--;
-
-    // Clear out dead entities
-    if (entity.health <= 0) {
-      entities.splice(i, 1);
-    }
-  }
-}
-
-function collisionDetection(): void {
-  collisionDetectionEntityToTile();
-  collisionDetectionEntityToEntity();
-}
-
-function collisionDetectionEntityToEntity(): void {
-  for (const entity of entities) {
-    for (const other of entities) {
-      if (entity !== other && entity.distance(other) < TILE_SIZE) {
-        if (entity === player && other.entityType === ENTITY_TYPE_COIN) {
-          score += 100;
-          other.health = 0;
-          zzfx(...coinSound);
-        }
-        if (entity === player && other.entityType === ENTITY_TYPE_JUMPPAD) {
-          player.y = Math.min(player.y, other.y - 8);
-          player.dx = 0;
-          player.dy = -PLAYER_JUMP_POWER * 2;
-          zzfx(...jumpPadSound);
-        }
-        if (entity === player && other.entityType === ENTITY_TYPE_WALKING_ENEMY) {
-          if (player.y + HALF_TILE_SIZE < other.y) {
-            // If the player is at least half a tile above the enemy, kill the enemy
-            other.health -= 100;
-            player.dy = -PLAYER_JUMP_POWER;
-            zzfx(...jumpSound);
-          } else {
-            // Otherwise hurt the player
-            player.health -= 10;
-            player.dy = -0.25 * PLAYER_JUMP_POWER;
-
-            // Push the player away from the enemy
-            if (player.x < other.x) {
-              player.x = other.x - TILE_SIZE - HALF_TILE_SIZE;
-            } else {
-              player.x = other.x + TILE_SIZE + HALF_TILE_SIZE;
-            }
-            zzfx(...hurtSound);
-          }
-        }
-      }
-    }
-  }
-}
-
-function updateCamera(): void {
-  if (player.x - viewportX > 300) {
-    viewportX = player.x - 300;
-  } else if (viewportX + WIDTH - player.x > 300) {
-    viewportX = player.x + 300 - WIDTH;
-  }
-
-  if (viewportX < 0) {
-    viewportX = 0;
-  }
-
-  if (viewportX + WIDTH > TILEMAP_WIDTH * TILE_SIZE) {
-    viewportX = TILEMAP_WIDTH * TILE_SIZE - WIDTH;
-  }
-}
-
-function render(): void {
-  clearScreen();
-  drawTileMap();
-  drawEntities();
-  drawOverlay();
-}
-
-function clearScreen(): void {
-  ctx.fillStyle = skyGradient;
-  ctx.fillRect(0, 0, WIDTH, HEIGHT);
-}
-
-function drawTileMap(): void {
-  for (let y = 0; y < TILEMAP_HEIGHT; y++) {
-    for (let x = 0; x < TILEMAP_WIDTH; x++) {
-      const tile = getTile(x, y);
-      if (tile > 0) {
-        const tx = (tile - 1) * TILE_SIZE;
-        const ty = 24;
-        ctx.drawImage(
-          image,
-          tx,
-          ty,
-          TILE_SIZE,
-          TILE_SIZE,
-          Math.floor(x * TILE_SIZE - viewportX),
-          y * TILE_SIZE,
-          TILE_SIZE,
-          TILE_SIZE,
-        );
-      }
+function runInput(): void {
+  if (wasPressed('KeyP') || wasPressed('Escape')) {
+    if (scene === SCENE_PAUSE) {
+      resumeGame();
+    } else {
+      pauseGame();
     }
   }
 }
 
-function drawEntities(): void {
-  for (const entity of entities) {
-    ctx.save();
-    ctx.translate(Math.floor(entity.x - viewportX + HALF_TILE_SIZE), Math.floor(entity.y + HALF_TILE_SIZE));
-    ctx.scale(entity.direction, 1);
-    let sx = 0;
-    if (entity.entityType === ENTITY_TYPE_PLAYER) {
-      const walking = Math.abs(entity.dx) > 0.01;
-      sx = !entity.grounded ? 48 : walking ? 16 + (entity.frame | 0) * TILE_SIZE : 0;
-    } else if (entity.entityType === ENTITY_TYPE_COIN) {
-      sx = 64 + (entity.frame | 0) * TILE_SIZE;
-    } else if (entity.entityType === ENTITY_TYPE_JUMPPAD) {
-      sx = 96;
-    } else if (entity.entityType === ENTITY_TYPE_WALKING_ENEMY) {
-      sx = 112 + (entity.frame | 0) * TILE_SIZE;
+function frame(now: number): void {
+  const dt = Math.min(0.05, last ? (now - last) / 1000 : 0.016);
+  last = now;
+  handleTap();
+  if (scene === SCENE_RUN) {
+    runInput();
+    updatePlayer(dt);
+    if (countdown <= 0) {
+      recordTick(dt, s, x, heading);
     }
-    ctx.drawImage(image, sx, 8, TILE_SIZE, TILE_SIZE, -HALF_TILE_SIZE, -HALF_TILE_SIZE, TILE_SIZE, TILE_SIZE);
-    ctx.restore();
-    entity.frame += dt * 0.005;
-    if (entity.frame >= 2) {
-      entity.frame = 0;
-    }
+    tickFinish();
+  } else {
+    handleMenuKey();
   }
+  renderWorld();
+  drawUi(ui);
+  clearFrameInput();
+  requestAnimationFrame(frame);
 }
 
-function drawOverlay(): void {
-  ctx.fillStyle = '#000';
-  ctx.fillRect(0, 0, WIDTH, 16);
-
-  drawString('HEALTH  ' + player.health, 4, 6);
-  drawString('SCORE   ' + score, 150, 6);
-  drawString('TIME    ' + ((gameTime / 1000) | 0), 300, 6);
+function main(): void {
+  loadSave();
+  initGl(canvas);
+  setSky(SKY_R, SKY_G, SKY_B);
+  initInput(uiCanvas);
+  initLadder();
+  resetPlayer();
+  resize();
+  window.addEventListener('resize', resize);
+  window.visualViewport?.addEventListener('resize', resize);
+  requestAnimationFrame(frame);
 }
 
-function drawString(str: string, x: number, y: number): void {
-  for (let i = 0; i < str.length; i++) {
-    const charCode = str.charCodeAt(i);
-    const charIndex = charCode < 65 ? charCode - 48 : charCode - 55;
-    ctx.drawImage(image, charIndex * 6, 0, 6, 6, x, y, 6, 6);
-    x += 6;
-  }
-}
-
-requestAnimationFrame(gameLoop);
+main();

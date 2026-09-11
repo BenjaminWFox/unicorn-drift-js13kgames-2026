@@ -1,24 +1,49 @@
-export interface Input {
-  down: boolean;
-  downCount: number;
-  upCount: number;
+const down = new Set<string>();
+const pressed = new Set<string>();
+
+export let tapX = -1;
+export let tapY = -1;
+
+export function initInput(canvas: HTMLCanvasElement): void {
+  window.addEventListener('keydown', (e) => {
+    if (e.target instanceof HTMLInputElement) {
+      return;
+    }
+    if (e.code === 'Space' || e.code.startsWith('Arrow')) {
+      e.preventDefault();
+    }
+    down.add(e.code);
+    if (!e.repeat) {
+      pressed.add(e.code);
+    }
+  });
+  window.addEventListener('keyup', (e) => {
+    down.delete(e.code);
+  });
+
+  canvas.addEventListener('pointerdown', (e) => {
+    tapX = e.clientX;
+    tapY = e.clientY;
+  });
+  canvas.addEventListener(
+    'touchstart',
+    (e) => {
+      e.preventDefault();
+    },
+    { passive: false }
+  );
 }
 
-/**
- * Creates a new input.
- */
-export const newInput = (): Input => ({ down: false, downCount: 0, upCount: 2 });
+export function held(code: string): boolean {
+  return down.has(code);
+}
 
-/**
- * Updates the up/down counts for an input.
- * @param input
- */
-export function updateInput(input: Input): void {
-  if (input.down) {
-    input.downCount++;
-    input.upCount = 0;
-  } else {
-    input.downCount = 0;
-    input.upCount++;
-  }
+export function wasPressed(code: string): boolean {
+  return pressed.has(code);
+}
+
+export function clearFrameInput(): void {
+  pressed.clear();
+  tapX = -1;
+  tapY = -1;
 }
