@@ -229,12 +229,15 @@ export function syncPose(): void {
   surface(s, x, hop, pose);
   glued = onRibbon(pose) ? 1 : 0;
   if (glued) {
-    fwd[0] = pose.tx;
-    fwd[1] = pose.ty;
-    fwd[2] = pose.tz;
-    right[0] = pose.nx;
-    right[1] = pose.ny;
-    right[2] = pose.nz;
+    // Compass yaw is junk when T is vertical; cock facing around ribbon up.
+    const c = Math.cos(slip);
+    const sn = Math.sin(slip);
+    fwd[0] = pose.tx * c + pose.nx * sn;
+    fwd[1] = pose.ty * c + pose.ny * sn;
+    fwd[2] = pose.tz * c + pose.nz * sn;
+    right[0] = pose.nx * c - pose.tx * sn;
+    right[1] = pose.ny * c - pose.ty * sn;
+    right[2] = pose.nz * c - pose.tz * sn;
     up[0] = pose.ux;
     up[1] = pose.uy;
     up[2] = pose.uz;
