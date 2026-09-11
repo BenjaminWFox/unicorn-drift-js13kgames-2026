@@ -149,7 +149,7 @@ function renderWorld(dt: number): void {
   const sx = onTitle ? right[0] : velR[0];
   const sy = onTitle ? right[1] : velR[1];
   const sz = onTitle ? right[2] : velR[2];
-  const side = onTitle ? 3.2 : glued ? 0 : -slip * 2.6;
+  const side = onTitle ? -4.5 : glued ? 0 : -slip * 2.6;
   // Keep the chase cam mostly level on hills; only loops should roll with the ribbon.
   const level = Math.max(0, Math.min(1, (uy - 0.32) / 0.58));
   const keep = 1 - level * 0.82;
@@ -168,10 +168,12 @@ function renderWorld(dt: number): void {
   cfy /= cl;
   cfz /= cl;
   const lookS = onTitle ? 8 : 15;
-  surface(s + lookS, onTitle ? x : x * 0.18, 1.35, camFr);
-  let fEx = px - cfx * CAM_BACK + cux * CAM_HEIGHT + sx * side;
-  let fEy = py - cfy * CAM_BACK + cuy * CAM_HEIGHT + sy * side;
-  let fEz = pz - cfz * CAM_BACK + cuz * CAM_HEIGHT + sz * side;
+  surface(s + lookS, onTitle ? 2.4 : x * 0.18, 1.35, camFr);
+  const camBack = onTitle ? 11.2 : CAM_BACK;
+  const camH = onTitle ? 5.4 : CAM_HEIGHT;
+  let fEx = px - cfx * camBack + cux * camH + sx * side;
+  let fEy = py - cfy * camBack + cuy * camH + sy * side;
+  let fEz = pz - cfz * camBack + cuz * camH + sz * side;
   let fLx = falling > 0 ? px + fx * CAM_LOOK : camFr.x;
   let fLy = falling > 0 ? py + CAM_LOOK_Y : camFr.y;
   let fLz = falling > 0 ? pz + fz * CAM_LOOK : camFr.z;

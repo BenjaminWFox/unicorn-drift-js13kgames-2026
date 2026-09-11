@@ -1,0 +1,12 @@
+---
+description: Do not test this project in the browser unless the user explicitly asks
+alwaysApply: true
+---
+
+# No browser testing
+
+Do not open, navigate, screenshot, or otherwise verify this game in the browser.
+
+The user tests UI and gameplay themselves and will report back. Skip browser tools, browser MCP, and any substitute "open the app and click around" workflow.
+
+Only use the browser if the user explicitly asks for it in that message.

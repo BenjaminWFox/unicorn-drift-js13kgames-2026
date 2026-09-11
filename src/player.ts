@@ -487,13 +487,13 @@ export function currentLap(): number {
 }
 
 export function idleTitle(): void {
-  s = 6;
-  x = 0.4;
+  s = 14;
+  x = 0;
   hop = 0;
   slide = 0;
   falling = 0;
   surface(s, x, 0, pose);
-  heading = tangentYaw(pose) - 0.35;
+  heading = tangentYaw(pose);
   travel = heading;
   slip = 0;
   glued = 0;

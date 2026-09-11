@@ -28,6 +28,7 @@ let cssH = 1;
 let focus = 0;
 let newBest = false;
 let finishMs = 0;
+let finishFocusAt = 0;
 
 type Btn = { x: number; y: number; w: number; h: number; label: string; id: number };
 const btns: Btn[] = [];
@@ -59,7 +60,8 @@ export function finishRace(): void {
     setPlayback(raw);
   }
   scene = SCENE_FINISH;
-  focus = 0;
+  focus = -1;
+  finishFocusAt = performance.now() + 1000;
 }
 
 export function pauseGame(): void {
@@ -104,8 +106,8 @@ function plate(
   const visL = m.actualBoundingBoxLeft;
   const visR = m.actualBoundingBoxRight;
   const drawX = align === 'center' ? x - (visR - visL) * 0.5 : align === 'right' ? x - visR : x;
-  const padX = 12;
-  const padY = padX * 2;
+  const padX = Math.max(12, size * 0.35);
+  const padY = Math.max(24, size * 0.55);
   ctx.fillStyle = 'rgba(0,0,0,0.55)';
   ctx.fillRect(drawX - visL - padX, y - padY, visL + visR + padX * 2, padY * 2);
   ctx.fillStyle = fill;
@@ -313,6 +315,7 @@ function hit(id: number): void {
     }
     if (id === 1) {
       scene = SCENE_TITLE;
+      focus = 0;
     }
     if (id === 2) {
       commitName();
@@ -365,17 +368,17 @@ export function drawUi(ctx: CanvasRenderingContext2D): void {
   const bw = Math.min(280, cssW * 0.7);
 
   if (scene === SCENE_TITLE) {
-    rainbowTitle(ctx, 'UniCARn', cssH * 0.16, Math.min(72, cssW * 0.14));
-    plate(ctx, 'BEST  ' + formatTime(best), mid, cssH * 0.28, 18, 'center', '#ffd24a');
-    addBtn(mid - bw * 0.5, cssH * 0.7, bw, 52, 'START', 0);
-    addBtn(mid - bw * 0.5, cssH * 0.7 + 60, bw, 44, 'HIGH SCORES', 1);
+    rainbowTitle(ctx, 'UniCARn', cssH * 0.11, Math.min(72, cssW * 0.14));
+    plate(ctx, 'BEST  ' + formatTime(best), mid, cssH * 0.22, 28, 'center', '#ffd24a');
+    const startY = cssH - 176;
+    addBtn(mid - bw * 0.5, startY, bw, 52, 'START', 0);
     nameBox.x = mid - bw * 0.5;
-    nameBox.y = cssH * 0.58;
-    nameBox.w = bw * 0.62;
+    nameBox.y = startY + 60;
+    nameBox.w = bw * 0.5;
     nameBox.h = 44;
-    addBtn(nameBox.x + nameBox.w + 8, nameBox.y, bw * 0.38 - 8, 44, 'NAME', 2);
+    addBtn(nameBox.x + nameBox.w + 8, nameBox.y, bw * 0.5 - 8, 44, 'SET NAME', 2);
+    addBtn(mid - bw * 0.5, startY + 112, bw, 44, 'HIGH SCORES', 1);
     drawBtns(ctx);
-    plate(ctx, 'ARROWS DRIVE   SPACE HOP', mid, cssH * 0.94, 14, 'center', '#ccc');
     syncNameField(true);
     return;
   }
@@ -417,19 +420,27 @@ export function drawUi(ctx: CanvasRenderingContext2D): void {
   }
 
   if (scene === SCENE_FINISH) {
-    rainbowTitle(ctx, 'FINISH', cssH * 0.16, 56);
-    plate(ctx, formatTime(finishMs), mid, cssH * 0.3, 28, 'center', newBest ? '#ffd24a' : '#fff');
+    rainbowTitle(ctx, 'FINISH', cssH * 0.16, 168);
+    plate(ctx, formatTime(finishMs), mid, cssH * 0.34, 56, 'center', newBest ? '#ffd24a' : '#fff');
     if (newBest) {
-      plate(ctx, 'NEW BEST!', mid, cssH * 0.38, 20, 'center', '#ffd24a');
+      plate(ctx, 'NEW BEST!', mid, cssH * 0.46, 40, 'center', '#ffd24a');
     }
     nameBox.x = mid - 210;
-    nameBox.y = cssH * 0.46;
+    nameBox.y = cssH * 0.54;
     nameBox.w = 260;
     nameBox.h = 44;
-    addBtn(mid + 58, cssH * 0.46, 152, 44, 'UPDATE NAME', 2);
-    drawLadder(ctx, mid - 210, cssH * 0.54, 5);
+    addBtn(mid + 58, cssH * 0.54, 152, 44, 'UPDATE NAME', 2);
+    drawLadder(ctx, mid - 210, cssH * 0.62, 5);
     addBtn(mid - 210, cssH * 0.84, 200, 48, 'RACE AGAIN', 0);
     addBtn(mid + 10, cssH * 0.84, 200, 48, 'MENU', 1);
+    if (focus < 0 && performance.now() >= finishFocusAt) {
+      for (let i = 0; i < btns.length; i++) {
+        if (btns[i].id === 0) {
+          focus = i;
+          break;
+        }
+      }
+    }
     drawBtns(ctx);
     syncNameField(true);
   }
