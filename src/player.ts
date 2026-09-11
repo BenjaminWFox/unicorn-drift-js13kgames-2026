@@ -44,6 +44,7 @@ export let slideCharge = 0;
 let slideAge = 0;
 let exitBoost = 0;
 let padBoost = 0;
+let padAt = -1;
 let cling = 0;
 let fallSteep = 0;
 export let glued = 0;
@@ -145,6 +146,7 @@ export function resetPlayer(): void {
   slideCharge = 0;
   exitBoost = 0;
   padBoost = 0;
+  padAt = -1;
   cling = 0;
   fallSteep = 0;
   falling = 0;
@@ -198,6 +200,7 @@ function respawn(): void {
   slideCharge = 0;
   exitBoost = 0;
   padBoost = 0;
+  padAt = -1;
   cling = 0;
   falling = 0;
   fallSteep = 0;
@@ -358,13 +361,17 @@ export function updatePlayer(dt: number): void {
     boosting += SLIDE_EXIT_BOOST;
     emitFlames(pose.x, pose.y, pose.z, vel, up, velR, 3);
   }
-  if (hop < 0.45 && onBoostPad(s, x, slip)) {
-    if (padBoost <= 0) {
+  const hitPad = hop < 0.45 ? onBoostPad(s, x, slip) : -1;
+  if (hitPad >= 0) {
+    if (hitPad !== padAt) {
       speed += PAD_SPEED;
       burstPad(pose.x, pose.y, pose.z, vel, velU, velR, speed);
       emitFlames(pose.x, pose.y, pose.z, vel, up, velR, 8);
     }
+    padAt = hitPad;
     padBoost = PAD_TIME;
+  } else {
+    padAt = -1;
   }
   if (padBoost > 0) {
     padBoost = Math.max(0, padBoost - dt);
@@ -434,12 +441,6 @@ export function updatePlayer(dt: number): void {
   if (Math.abs(x) > LIP) {
     if (steep && !st) {
       x = Math.sign(x) * (LIP - 0.12);
-    } else if (cling > 0 || slide > 0 || Math.abs(slip) > 0.1) {
-      x = Math.sign(x) * (LIP - 0.12);
-      travel += wrapDelta(tangentYaw(moveFr) - travel) * 0.65;
-      heading += wrapDelta(travel - heading) * 0.35;
-      slip = wrapDelta(heading - travel);
-      cling = Math.max(cling, 0.25);
     } else {
       startFall();
       syncPose();

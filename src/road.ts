@@ -89,7 +89,7 @@ function buildRoad(): void {
 
 buildRoad();
 
-export function onBoostPad(ps: number, px: number, ang: number): boolean {
+export function onBoostPad(ps: number, px: number, ang: number): number {
   const c = Math.cos(ang);
   const sn = Math.sin(ang);
   for (let i = 0; i < pads.length; i += 2) {
@@ -102,11 +102,11 @@ export function onBoostPad(ps: number, px: number, ang: number): boolean {
         wrapS(ps + lz * c - lx * sn - s0) < PAD_LEN + 0.7 &&
         Math.abs(px + lx * c + lz * sn - xc) < PAD_HALF + 0.12
       ) {
-        return true;
+        return i;
       }
     }
   }
-  return false;
+  return -1;
 }
 
 export function drawRoad(view: Float32Array): void {
