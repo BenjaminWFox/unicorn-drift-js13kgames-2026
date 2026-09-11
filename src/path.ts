@@ -1,4 +1,4 @@
-import { CONCAVE, ROAD_HALF } from './constants';
+import { CONCAVE, PAD_LANE, ROAD_HALF } from './constants';
 
 export type Frame = {
   s: number;
@@ -18,6 +18,7 @@ export type Frame = {
 
 const frames: Frame[] = [];
 export let trackLen = 1;
+export const pads: number[] = [];
 
 const STEP = 0.55;
 
@@ -231,6 +232,10 @@ function loop(R: number, F: number, lane: number): void {
   P[1] = P0[1];
 }
 
+function markPad(back: number, lane: number): void {
+  pads.push(Math.max(0, dist - back), lane);
+}
+
 function build(): void {
   frames.length = 0;
   P[0] = 0;
@@ -243,6 +248,7 @@ function build(): void {
   U[1] = 1;
   U[2] = 0;
   dist = 0;
+  pads.length = 0;
   push();
 
   const LEFT = Math.PI * 0.5;
@@ -258,11 +264,14 @@ function build(): void {
   const pre2 = 18 + 30 + 8 + LOOP2_F * Math.PI * 2 + 10;
 
   advance(26, STEP);
+  markPad(12, PAD_LANE);
   bump(6.5, 32);
   advance(6, STEP);
   loop(13.5, LOOP_F, LANE);
   advance(12, STEP);
+  markPad(10, -PAD_LANE);
   scurve(36, 1.05, 8);
+  markPad(22, PAD_LANE);
   bump(3.6, 18);
   advance(TAIL - 18, STEP);
   yawArc(C1, LEFT);
@@ -270,17 +279,21 @@ function build(): void {
   advance(8, STEP);
   yawArc(30, RIGHT);
   advance(12, STEP);
+  markPad(10, -PAD_LANE);
   yawArc(30, LEFT);
   bump(3.2, 20);
   advance(SHORT - 20, STEP);
   yawArc(C2, LEFT);
 
   advance(18, STEP);
+  markPad(12, PAD_LANE);
   bump(-5.5, 30);
   advance(8, STEP);
   loop(10.5, LOOP2_F, LANE);
   advance(10, STEP);
+  markPad(8, -PAD_LANE);
   scurve(36, 1.05, 8);
+  markPad(22, PAD_LANE);
   bump(3.8, 18);
   advance(TAIL + pre1 - pre2 - 18, STEP);
   yawArc(C1, LEFT);
@@ -288,6 +301,7 @@ function build(): void {
   advance(8, STEP);
   yawArc(30, RIGHT);
   advance(12, STEP);
+  markPad(10, -PAD_LANE);
   yawArc(30, LEFT);
   bump(-2.8, 20);
   advance(SHORT - 20, STEP);
@@ -323,7 +337,7 @@ function closeToStart(): void {
 
 build();
 
-function wrapS(s: number): number {
+export function wrapS(s: number): number {
   const L = trackLen;
   return ((s % L) + L) % L;
 }

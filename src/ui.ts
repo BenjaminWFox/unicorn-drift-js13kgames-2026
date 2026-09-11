@@ -1,4 +1,4 @@
-import { FONT, LAPS, RAINBOW } from './constants';
+import { FONT, LAPS, RAINBOW, SLIDE_CHARGE } from './constants';
 import { packGhost, recorded, resetRecord, setPlayback } from './ghost';
 import { tapX, tapY, wasPressed } from './input';
 import { boardRows, formatTime, publishName, publishScore } from './ladder';
@@ -10,6 +10,8 @@ import {
   lastTime,
   raceTime,
   resetPlayer,
+  slide,
+  slideCharge,
 } from './player';
 import { best, NAME_MAX, noteBest, playerId, playerName, setPlayerName } from './save';
 
@@ -143,6 +145,51 @@ function roundRect(
   ctx.arcTo(x, y + h, x, y, r);
   ctx.arcTo(x, y, x + w, y, r);
   ctx.closePath();
+}
+
+function drawSlideBar(ctx: CanvasRenderingContext2D): void {
+  if (slide <= 0 && slideCharge <= 0.02) {
+    return;
+  }
+  const w = Math.min(480, cssW * 0.72);
+  const h = 56;
+  const x = cssW * 0.5 - w * 0.5;
+  const y = cssH - 78;
+  const hot = slide > 0 && slideCharge >= 1;
+  const pulse = 0.55 + 0.45 * Math.abs(Math.sin(raceTime * 16));
+  ctx.save();
+  ctx.globalAlpha = slide > 0 ? 1 : Math.min(1, slideCharge * 3);
+  ctx.fillStyle = 'rgba(0,0,0,0.72)';
+  roundRect(ctx, x - 8, y - 8, w + 16, h + 16, 12);
+  ctx.fill();
+  ctx.fillStyle = '#1a1022';
+  roundRect(ctx, x, y, w, h, 8);
+  ctx.fill();
+  ctx.save();
+  roundRect(ctx, x, y, w, h, 8);
+  ctx.clip();
+  const filled = w * slideCharge;
+  for (let i = 0; i < 7; i++) {
+    const bx = x + (w * i) / 7;
+    if (bx >= x + filled) {
+      break;
+    }
+    const c = rgb(RAINBOW[i]);
+    ctx.fillStyle =
+      'rgb(' + ((c[0] * 255) | 0) + ',' + ((c[1] * 255) | 0) + ',' + ((c[2] * 255) | 0) + ')';
+    ctx.fillRect(bx, y, Math.min(w / 7 + 1, x + filled - bx), h);
+  }
+  ctx.restore();
+  const minX = x + w * (0.2 / SLIDE_CHARGE);
+  ctx.fillStyle = 'rgba(255,255,255,0.7)';
+  ctx.fillRect(minX, y - 4, 4, h + 8);
+  ctx.fillStyle = '#ffd24a';
+  ctx.fillRect(x + w - 5, y - 4, 5, h + 8);
+  ctx.strokeStyle = hot ? '#ffd24a' : 'rgba(255,255,255,0.28)';
+  ctx.lineWidth = hot ? 3 + pulse : 2;
+  roundRect(ctx, x - 8, y - 8, w + 16, h + 16, 12);
+  ctx.stroke();
+  ctx.restore();
 }
 
 function drawBtns(ctx: CanvasRenderingContext2D): void {
@@ -339,6 +386,7 @@ export function drawUi(ctx: CanvasRenderingContext2D): void {
     plate(ctx, formatTime((raceTime * 1000) | 0), mid, 28, 22, 'center');
     plate(ctx, 'LAP  ' + currentLap() + '/' + LAPS, 70, 28, 16, 'left');
     plate(ctx, 'BEST  ' + formatTime(best), cssW - 24, 28, 16, 'right', '#ffd24a');
+    drawSlideBar(ctx);
     if (countdown > 0) {
       const n = Math.ceil(countdown);
       rainbowTitle(ctx, n > 0 && countdown > 0.15 ? String(n) : 'GO', cssH * 0.42, 96);

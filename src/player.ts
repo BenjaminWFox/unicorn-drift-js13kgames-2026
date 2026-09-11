@@ -10,10 +10,13 @@ import {
   LIP,
   MAX_REV,
   MAX_SPEED,
+  PAD_SPEED,
+  PAD_TIME,
   PENALTY,
   EXIT_ALIGN,
   GRIP_FOLLOW,
   SLIDE_BOOST,
+  SLIDE_CHARGE,
   SLIDE_EXIT_BOOST,
   SLIDE_EXIT_KICK,
   SLIDE_HOOK,
@@ -25,6 +28,7 @@ import {
 } from './constants';
 import { held, wasPressed } from './input';
 import { frameAt, gateS, headingAxes, surface, tangentYaw, trackLen, type Frame } from './path';
+import { onBoostPad } from './road';
 import { burstSparks, clearSparks, emitFlames, updateSparks } from './sparks';
 
 export let s = 0;
@@ -36,8 +40,10 @@ export let speed = 0;
 export let hop = 0;
 export let hopV = 0;
 export let slide = 0;
+export let slideCharge = 0;
 let slideAge = 0;
 let exitBoost = 0;
+let padBoost = 0;
 let cling = 0;
 export let glued = 0;
 export let falling = 0;
@@ -135,7 +141,9 @@ export function resetPlayer(): void {
   hopV = 0;
   slide = 0;
   slideAge = 0;
+  slideCharge = 0;
   exitBoost = 0;
+  padBoost = 0;
   cling = 0;
   falling = 0;
   fallY = 0;
@@ -184,7 +192,9 @@ function respawn(): void {
   hopV = 0;
   slide = 0;
   slideAge = 0;
+  slideCharge = 0;
   exitBoost = 0;
+  padBoost = 0;
   cling = 0;
   falling = 0;
   dist = lap * trackLen + s;
@@ -287,7 +297,7 @@ export function updatePlayer(dt: number): void {
   if (hop > 0) {
     hopV -= HOP_GRAV * dt;
     hop += hopV * dt;
-    if (st && hopV > -2) {
+    if (st && hopV > -2 && held('Space')) {
       if (slide <= 0) {
         heading += st * SLIDE_KICK;
         slideAge = 0;
@@ -305,7 +315,8 @@ export function updatePlayer(dt: number): void {
   if (slide > 0) {
     cling = 0.7;
     slideAge += dt;
-    if (turningOut || !st) {
+    slideCharge = Math.min(1, slideAge / SLIDE_CHARGE);
+    if (turningOut || !st || !held('Space')) {
       slide = 0;
     } else {
       slide -= dt * 0.22;
@@ -318,10 +329,11 @@ export function updatePlayer(dt: number): void {
   } else {
     cling = Math.max(0, cling - dt);
     boosting = 0;
+    slideCharge = Math.max(0, slideCharge - dt * 3.6);
   }
   if (wasSliding && slide <= 0) {
     if (slideAge > 0.2) {
-      const charge = Math.min(1, slideAge / 1.35);
+      const charge = Math.min(1, slideAge / SLIDE_CHARGE);
       exitBoost = Math.min(2.5, 0.28 + slideAge * 0.85);
       speed += SLIDE_EXIT_KICK * charge;
       emitFlames(pose.x, pose.y, pose.z, vel, up, velR, 14);
@@ -330,8 +342,20 @@ export function updatePlayer(dt: number): void {
   }
   if (exitBoost > 0) {
     exitBoost = Math.max(0, exitBoost - dt);
-    boosting = Math.max(boosting, SLIDE_EXIT_BOOST);
+    boosting += SLIDE_EXIT_BOOST;
     emitFlames(pose.x, pose.y, pose.z, vel, up, velR, 3);
+  }
+  if (hop < 0.45 && onBoostPad(s, x)) {
+    if (padBoost <= 0) {
+      speed += PAD_SPEED;
+      emitFlames(pose.x, pose.y, pose.z, vel, up, velR, 12);
+    }
+    padBoost = PAD_TIME;
+  }
+  if (padBoost > 0) {
+    padBoost = Math.max(0, padBoost - dt);
+    boosting += PAD_SPEED;
+    emitFlames(pose.x, pose.y, pose.z, vel, up, velR, 2);
   }
 
   const cap = MAX_SPEED + boosting;
@@ -342,7 +366,7 @@ export function updatePlayer(dt: number): void {
     speed = -MAX_REV;
   }
 
-  const grip = 0.2 + 0.5 * Math.min(1, Math.abs(speed) / 16);
+  const grip = 0.52 + 0.46 * Math.min(1, Math.abs(speed) / 16);
   const holdingDrift = slide > 0 && st && !turningOut;
   if (holdingDrift) {
     heading += st * SLIDE_STEER * dt;
@@ -353,8 +377,7 @@ export function updatePlayer(dt: number): void {
     if (!st || turningOut || cling > 0) {
       straighten(dt);
     }
-    const off = Math.abs(wrapDelta(heading - travel));
-    chaseTravel(1.6 + (GRIP_FOLLOW - 1.6) * Math.max(0, 1 - off / 0.35), dt);
+    chaseTravel(GRIP_FOLLOW, dt);
     slip = wrapDelta(heading - travel);
   }
 
