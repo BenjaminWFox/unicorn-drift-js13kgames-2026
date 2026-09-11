@@ -17,8 +17,10 @@ import {
   countdown,
   falling,
   fwd,
+  glued,
   ghostPose,
   heading,
+  hop,
   idleTitle,
   pose,
   resetPlayer,
@@ -75,7 +77,7 @@ const gPose: Frame = {
 const gF = [0, 0, 1];
 const gN = [1, 0, 0];
 const gU = [0, 1, 0];
-const gSamp: Sample = { t: 0, s: 0, x: 0, h: 0 };
+const gSamp: Sample = { t: 0, s: 0, x: 0, h: 0, p: 0 };
 
 let last = 0;
 
@@ -124,7 +126,7 @@ function renderWorld(): void {
   const sx = onTitle ? right[0] : velR[0];
   const sy = onTitle ? right[1] : velR[1];
   const sz = onTitle ? right[2] : velR[2];
-  const side = onTitle ? 3.2 : -slip * 2.6;
+  const side = onTitle ? 3.2 : glued ? 0 : -slip * 2.6;
   lookAt(
     view,
     px - fx * CAM_BACK + ux * CAM_HEIGHT + sx * side,
@@ -141,7 +143,7 @@ function renderWorld(): void {
   drawStars(view);
   drawRoad(view);
   if ((scene === SCENE_RUN || scene === SCENE_PAUSE) && hasGhost() && ghostAt(ghostClock(), gSamp)) {
-    ghostPose(gSamp.s, gSamp.x, gSamp.h, gPose, gF, gN, gU);
+    ghostPose(gSamp.s, gSamp.x, gSamp.h, gPose, gF, gN, gU, gSamp.p);
     drawUnicarn(
       view,
       gPose.x,
@@ -200,7 +202,7 @@ function frame(now: number): void {
     runInput();
     updatePlayer(dt);
     if (countdown <= 0) {
-      recordTick(dt, s, x, heading);
+      recordTick(dt, s, x, heading, hop);
     }
     tickFinish();
   } else {

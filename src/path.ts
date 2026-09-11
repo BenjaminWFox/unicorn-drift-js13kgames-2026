@@ -112,34 +112,85 @@ function yawArc(radius: number, sweep: number): void {
   }
 }
 
-function bump(height: number, len: number): void {
-  const steps = Math.max(8, Math.round(len / (STEP * 0.65)));
-  const ds = len / steps;
+function loop(R: number, F: number, lane: number): void {
   const T0 = [T[0], T[1], T[2]];
   const U0 = [U[0], U[1], U[2]];
+  const N0 = [0, 0, 0];
+  cross(U0, T0, N0);
+  norm(N0);
   const P0 = [P[0], P[1], P[2]];
+  const steps = Math.max(64, Math.round(((R + Math.abs(F)) * Math.PI * 2) / STEP));
+  const N = [0, 0, 0];
   for (let i = 1; i <= steps; i++) {
     const t = i / steps;
-    const y = height * Math.sin(Math.PI * t) * Math.sin(Math.PI * t);
-    const dyds = ((height * Math.PI) / len) * Math.sin(2 * Math.PI * t);
-    const pitch = Math.atan(dyds);
-    P[0] = P0[0] + T0[0] * (ds * i);
-    P[1] = P0[1] + T0[1] * (ds * i) + y;
-    P[2] = P0[2] + T0[2] * (ds * i);
-    T[0] = T0[0];
-    T[1] = T0[1];
-    T[2] = T0[2];
+    const th = t * Math.PI * 2;
+    const cy = R * (1 - Math.cos(th));
+    const cz = R * Math.sin(th) + F * th;
+    // Smooth lane change: ends parallel to the approach (zero dN at 0 and 2π).
+    const cn = lane * t * t * (3 - 2 * t);
+    const dcn = (lane * 6 * t * (1 - t)) / (Math.PI * 2);
+    P[0] = P0[0] + U0[0] * cy + T0[0] * cz + N0[0] * cn;
+    P[1] = P0[1] + U0[1] * cy + T0[1] * cz + N0[1] * cn;
+    P[2] = P0[2] + U0[2] * cy + T0[2] * cz + N0[2] * cn;
+    const dcy = R * Math.sin(th);
+    const dcz = R * Math.cos(th) + F;
+    T[0] = U0[0] * dcy + T0[0] * dcz + N0[0] * dcn;
+    T[1] = U0[1] * dcy + T0[1] * dcz + N0[1] * dcn;
+    T[2] = U0[2] * dcy + T0[2] * dcz + N0[2] * dcn;
+    norm(T);
     U[0] = U0[0];
     U[1] = U0[1];
     U[2] = U0[2];
-    const N = [0, 0, 0];
-    cross(U0, T0, N);
+    rodrigues(U, N0, -th);
+    N[0] = N0[0];
+    N[1] = N0[1];
+    N[2] = N0[2];
+    const nd = T[0] * N[0] + T[1] * N[1] + T[2] * N[2];
+    N[0] -= T[0] * nd;
+    N[1] -= T[1] * nd;
+    N[2] -= T[2] * nd;
+    if (N[0] * N0[0] + N[1] * N0[1] + N[2] * N0[2] < 0) {
+      N[0] = -N[0];
+      N[1] = -N[1];
+      N[2] = -N[2];
+    }
     norm(N);
-    rodrigues(T, N, pitch);
-    rodrigues(U, N, pitch);
-    dist += ds;
-    push();
+    const ud = T[0] * U[0] + T[1] * U[1] + T[2] * U[2];
+    U[0] -= T[0] * ud;
+    U[1] -= T[1] * ud;
+    U[2] -= T[2] * ud;
+    const un = N[0] * U[0] + N[1] * U[1] + N[2] * U[2];
+    U[0] -= N[0] * un;
+    U[1] -= N[1] * un;
+    U[2] -= N[2] * un;
+    norm(U);
+    const last = frames[frames.length - 1];
+    dist += Math.hypot(P[0] - last.x, P[1] - last.y, P[2] - last.z) || STEP;
+    frames.push({
+      s: dist,
+      x: P[0],
+      y: P[1],
+      z: P[2],
+      tx: T[0],
+      ty: T[1],
+      tz: T[2],
+      nx: N[0],
+      ny: N[1],
+      nz: N[2],
+      ux: U[0],
+      uy: U[1],
+      uz: U[2],
+    });
   }
+  // Parallel transport around a shifted loop banks the exit. Snap back so
+  // the oval stays in XZ; position is already on the exit lane.
+  T[0] = T0[0];
+  T[1] = T0[1];
+  T[2] = T0[2];
+  U[0] = U0[0];
+  U[1] = U0[1];
+  U[2] = U0[2];
+  P[1] = P0[1];
 }
 
 function build(): void {
@@ -156,24 +207,31 @@ function build(): void {
   dist = 0;
   push();
 
-  // Wide left-hand oval: hold a light left to stay on. No loops yet.
-  const LONG = 64;
+  // Near-planar vertical loops (coaster shift-separation): exit sits beside entry.
+  const LONG = 100;
   const SHORT = 32;
   const CORNER = 88;
   const TURN = Math.PI * 0.5;
-  const HILL = 44;
+  const LANE = -15;
+  const LOOP_R = 13.5;
+  const LOOP_F = 2.8;
+  const LOOP_ADV = LOOP_F * Math.PI * 2;
+  const LOOP2_R = 10.5;
+  const LOOP2_F = 2.2;
+  const LOOP2_ADV = LOOP2_F * Math.PI * 2;
 
-  advance(LONG * 0.55, STEP);
+  advance(44, STEP);
+  loop(LOOP_R, LOOP_F, LANE);
+  advance(LONG - 44 - LOOP_ADV, STEP);
   yawArc(CORNER, TURN);
   advance(SHORT, STEP);
   yawArc(CORNER, TURN);
-  advance(LONG * 0.22, STEP);
-  bump(4.5, HILL);
-  advance(LONG * 0.78 - HILL, STEP);
+  advance(28, STEP);
+  loop(LOOP2_R, LOOP2_F, LANE);
+  advance(LONG - 28 - LOOP2_ADV, STEP);
   yawArc(CORNER, TURN);
   advance(SHORT, STEP);
   yawArc(CORNER, TURN);
-  advance(LONG * 0.45, STEP);
   closeToStart();
 
   trackLen = dist;
@@ -253,12 +311,26 @@ export function frameAt(s: number, out: Frame): void {
   out.z = a.z + (b.z - a.z) * t;
   nlerp(a.tx, a.ty, a.tz, b.tx, b.ty, b.tz, t, tA);
   nlerp(a.ux, a.uy, a.uz, b.ux, b.uy, b.uz, t, uA);
-  cross(uA, tA, nA);
+  nlerp(a.nx, a.ny, a.nz, b.nx, b.ny, b.nz, t, nA);
+  const nd = tA[0] * nA[0] + tA[1] * nA[1] + tA[2] * nA[2];
+  nA[0] -= tA[0] * nd;
+  nA[1] -= tA[1] * nd;
+  nA[2] -= tA[2] * nd;
   if (Math.hypot(nA[0], nA[1], nA[2]) < 1e-5) {
     nA[0] = 1;
   }
   norm(nA);
-  cross(tA, nA, uA);
+  const ud = tA[0] * uA[0] + tA[1] * uA[1] + tA[2] * uA[2];
+  uA[0] -= tA[0] * ud;
+  uA[1] -= tA[1] * ud;
+  uA[2] -= tA[2] * ud;
+  const un = nA[0] * uA[0] + nA[1] * uA[1] + nA[2] * uA[2];
+  uA[0] -= nA[0] * un;
+  uA[1] -= nA[1] * un;
+  uA[2] -= nA[2] * un;
+  if (Math.hypot(uA[0], uA[1], uA[2]) < 1e-5) {
+    uA[1] = 1;
+  }
   norm(uA);
   out.tx = tA[0];
   out.ty = tA[1];

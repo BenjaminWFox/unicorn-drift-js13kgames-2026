@@ -1,5 +1,5 @@
 import { FONT, LAPS, RAINBOW } from './constants';
-import { packGhost, recorded, resetRecord } from './ghost';
+import { packGhost, recorded, resetRecord, setPlayback } from './ghost';
 import { tapX, tapY, wasPressed } from './input';
 import { boardRows, formatTime, publishName, publishScore } from './ladder';
 import { rgb } from './math';
@@ -47,10 +47,11 @@ export function startRun(): void {
 
 export function finishRace(): void {
   finishMs = (lastTime * 1000) | 0;
-  const packed = packGhost(recorded());
-  newBest = noteBest(finishMs, packed);
+  const raw = recorded().slice();
+  newBest = noteBest(finishMs, packGhost(raw, true));
   if (newBest) {
-    publishScore(packed);
+    publishScore(packGhost(raw));
+    setPlayback(raw);
   }
   scene = SCENE_FINISH;
   focus = 0;

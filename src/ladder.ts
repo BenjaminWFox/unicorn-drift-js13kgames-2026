@@ -264,12 +264,12 @@ function onMessage(data: string): void {
 }
 
 function applyGhost(): void {
-  if (topGhost) {
-    setPlayback(unpackGhost(topGhost.d));
+  if (localGhost && (!topGhost || topGhost.i === playerId)) {
+    setPlayback(unpackGhost(localGhost));
     return;
   }
-  if (localGhost) {
-    setPlayback(unpackGhost(localGhost));
+  if (topGhost) {
+    setPlayback(unpackGhost(topGhost.d));
   }
 }
 

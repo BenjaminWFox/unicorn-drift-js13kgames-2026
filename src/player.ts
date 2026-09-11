@@ -35,6 +35,7 @@ export let hop = 0;
 export let hopV = 0;
 export let slide = 0;
 let cling = 0;
+export let glued = 0;
 export let falling = 0;
 export let fallY = 0;
 export let countdown = COUNTDOWN;
@@ -116,6 +117,10 @@ function clampSlip(): void {
   }
 }
 
+export function onRibbon(fr: Frame): boolean {
+  return Math.abs(fr.ty) > 0.08 || fr.uy < 0.82;
+}
+
 export function resetPlayer(): void {
   s = 0.4;
   x = 0;
@@ -193,6 +198,28 @@ export function syncPose(): void {
     return;
   }
   surface(s, x, hop, pose);
+  glued = onRibbon(pose) ? 1 : 0;
+  if (glued) {
+    fwd[0] = pose.tx;
+    fwd[1] = pose.ty;
+    fwd[2] = pose.tz;
+    right[0] = pose.nx;
+    right[1] = pose.ny;
+    right[2] = pose.nz;
+    up[0] = pose.ux;
+    up[1] = pose.uy;
+    up[2] = pose.uz;
+    vel[0] = pose.tx;
+    vel[1] = pose.ty;
+    vel[2] = pose.tz;
+    velR[0] = pose.nx;
+    velR[1] = pose.ny;
+    velR[2] = pose.nz;
+    velU[0] = pose.ux;
+    velU[1] = pose.uy;
+    velU[2] = pose.uz;
+    return;
+  }
   headingAxes(pose, heading, fwd, right, up);
   headingAxes(pose, travel, vel, velR, velU);
 }
@@ -304,7 +331,8 @@ export function updatePlayer(dt: number): void {
   }
 
   frameAt(s, moveFr);
-  if (cling > 0 || turningOut) {
+  const steep = onRibbon(moveFr);
+  if ((cling > 0 || turningOut) && !steep) {
     travel += wrapDelta(tangentYaw(moveFr) - travel) * (1 - Math.exp(-2.6 * dt));
     slip = wrapDelta(heading - travel);
   }
@@ -312,9 +340,14 @@ export function updatePlayer(dt: number): void {
   const wz = Math.cos(travel);
   const tH = Math.hypot(moveFr.tx, moveFr.tz);
   const nH = Math.hypot(moveFr.nx, moveFr.nz);
-  const glue = Math.abs(moveFr.ty) > 0.35 || moveFr.uy < 0.25;
-  const along = tH < 0.18 || glue ? 1 : (moveFr.tx * wx + moveFr.tz * wz) / tH;
-  let side = nH > 1e-4 ? (moveFr.nx * wx + moveFr.nz * wz) / nH : 0;
+  const along = steep || tH < 0.18 ? 1 : (moveFr.tx * wx + moveFr.tz * wz) / tH;
+  // World XZ vs path tangent is noise once T is vertical — that was yeeting the kart off.
+  let side = 0;
+  if (!steep && nH > 1e-4) {
+    side = (moveFr.nx * wx + moveFr.nz * wz) / nH;
+  } else if (steep && st) {
+    side = nH > 1e-4 ? (moveFr.nx * wx + moveFr.nz * wz) / nH : 0;
+  }
   if (cling > 0 || turningOut) {
     side *= 0.28;
   }
@@ -334,7 +367,9 @@ export function updatePlayer(dt: number): void {
   wheel += speed * dt * 2.4;
 
   if (Math.abs(x) > LIP) {
-    if (cling > 0 || slide > 0 || Math.abs(slip) > 0.1) {
+    if (steep && !st) {
+      x = Math.sign(x) * (LIP - 0.12);
+    } else if (cling > 0 || slide > 0 || Math.abs(slip) > 0.1) {
       x = Math.sign(x) * (LIP - 0.12);
       travel += wrapDelta(tangentYaw(moveFr) - travel) * 0.65;
       heading += wrapDelta(travel - heading) * 0.35;
@@ -359,8 +394,29 @@ export function updatePlayer(dt: number): void {
   updateSparks(dt);
 }
 
-export function ghostPose(gs: number, gx: number, gh: number, out: Frame, F: number[], N: number[], Up: number[]): void {
-  surface(gs, gx, 0, out);
+export function ghostPose(
+  gs: number,
+  gx: number,
+  gh: number,
+  out: Frame,
+  F: number[],
+  N: number[],
+  Up: number[],
+  hop = 0
+): void {
+  surface(gs, gx, hop, out);
+  if (onRibbon(out)) {
+    F[0] = out.tx;
+    F[1] = out.ty;
+    F[2] = out.tz;
+    N[0] = out.nx;
+    N[1] = out.ny;
+    N[2] = out.nz;
+    Up[0] = out.ux;
+    Up[1] = out.uy;
+    Up[2] = out.uz;
+    return;
+  }
   headingAxes(out, gh, F, N, Up);
 }
 
@@ -378,6 +434,7 @@ export function idleTitle(): void {
   heading = tangentYaw(pose) - 0.35;
   travel = heading;
   slip = 0;
+  glued = 0;
   headingAxes(pose, heading, fwd, right, up);
   headingAxes(pose, travel, vel, velR, velU);
 }
