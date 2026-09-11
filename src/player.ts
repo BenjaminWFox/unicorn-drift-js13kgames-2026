@@ -14,6 +14,8 @@ import {
   EXIT_ALIGN,
   GRIP_FOLLOW,
   SLIDE_BOOST,
+  SLIDE_EXIT_BOOST,
+  SLIDE_EXIT_KICK,
   SLIDE_HOOK,
   SLIDE_KICK,
   SLIDE_SLIP,
@@ -23,7 +25,7 @@ import {
 } from './constants';
 import { held, wasPressed } from './input';
 import { frameAt, gateS, headingAxes, surface, tangentYaw, trackLen, type Frame } from './path';
-import { burstSparks, clearSparks, updateSparks } from './sparks';
+import { burstSparks, clearSparks, emitFlames, updateSparks } from './sparks';
 
 export let s = 0;
 export let x = 0;
@@ -34,6 +36,8 @@ export let speed = 0;
 export let hop = 0;
 export let hopV = 0;
 export let slide = 0;
+let slideAge = 0;
+let exitBoost = 0;
 let cling = 0;
 export let glued = 0;
 export let falling = 0;
@@ -129,6 +133,8 @@ export function resetPlayer(): void {
   hop = 0;
   hopV = 0;
   slide = 0;
+  slideAge = 0;
+  exitBoost = 0;
   cling = 0;
   falling = 0;
   fallY = 0;
@@ -176,6 +182,8 @@ function respawn(): void {
   hop = 0;
   hopV = 0;
   slide = 0;
+  slideAge = 0;
+  exitBoost = 0;
   cling = 0;
   falling = 0;
   dist = lap * trackLen + s;
@@ -281,6 +289,7 @@ export function updatePlayer(dt: number): void {
     if (st && hopV > -2) {
       if (slide <= 0) {
         heading += st * SLIDE_KICK;
+        slideAge = 0;
       }
       slide = SLIDE_TIME;
     }
@@ -291,19 +300,37 @@ export function updatePlayer(dt: number): void {
   }
 
   const turningOut = slide > 0 && st && slip && st * slip < 0;
+  const wasSliding = slide > 0;
   if (slide > 0) {
     cling = 0.7;
-    slide -= dt * (turningOut || !st ? 1.4 : 0.22);
-    if (slide < 0) {
+    slideAge += dt;
+    if (turningOut || !st) {
       slide = 0;
-    }
-    boosting = SLIDE_BOOST;
-    if (st && !turningOut) {
+    } else {
+      slide -= dt * 0.22;
+      if (slide < 0) {
+        slide = 0;
+      }
+      boosting = SLIDE_BOOST;
       burstSparks(pose.x, pose.y, pose.z, vel, up, velR);
     }
   } else {
     cling = Math.max(0, cling - dt);
-    boosting = cling > 0 ? SLIDE_BOOST * 0.4 : 0;
+    boosting = 0;
+  }
+  if (wasSliding && slide <= 0) {
+    if (slideAge > 0.2) {
+      const charge = Math.min(1, slideAge / 1.35);
+      exitBoost = Math.min(2.5, 0.28 + slideAge * 0.85);
+      speed += SLIDE_EXIT_KICK * charge;
+      emitFlames(pose.x, pose.y, pose.z, vel, up, velR, 14);
+    }
+    slideAge = 0;
+  }
+  if (exitBoost > 0) {
+    exitBoost = Math.max(0, exitBoost - dt);
+    boosting = Math.max(boosting, SLIDE_EXIT_BOOST);
+    emitFlames(pose.x, pose.y, pose.z, vel, up, velR, 3);
   }
 
   const cap = MAX_SPEED + boosting;

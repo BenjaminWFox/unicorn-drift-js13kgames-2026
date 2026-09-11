@@ -12,7 +12,7 @@ import { beginFrame, initGl, resizeGl, setSky } from './gl';
 import { clearFrameInput, initInput, wasPressed } from './input';
 import { initLadder } from './ladder';
 import { lookAt, mat4 } from './math';
-import { type Frame } from './path';
+import { surface, type Frame } from './path';
 import {
   countdown,
   falling,
@@ -78,6 +78,21 @@ const gF = [0, 0, 1];
 const gN = [1, 0, 0];
 const gU = [0, 1, 0];
 const gSamp: Sample = { t: 0, s: 0, x: 0, h: 0, p: 0 };
+const camFr: Frame = {
+  s: 0,
+  x: 0,
+  y: 0,
+  z: 0,
+  tx: 0,
+  ty: 0,
+  tz: 0,
+  nx: 0,
+  ny: 0,
+  nz: 0,
+  ux: 0,
+  uy: 0,
+  uz: 0,
+};
 
 let last = 0;
 
@@ -127,18 +142,34 @@ function renderWorld(): void {
   const sy = onTitle ? right[1] : velR[1];
   const sz = onTitle ? right[2] : velR[2];
   const side = onTitle ? 3.2 : glued ? 0 : -slip * 2.6;
-  lookAt(
-    view,
-    px - fx * CAM_BACK + ux * CAM_HEIGHT + sx * side,
-    py - fy * CAM_BACK + uy * CAM_HEIGHT + sy * side,
-    pz - fz * CAM_BACK + uz * CAM_HEIGHT + sz * side,
-    px + fx * CAM_LOOK + ux * CAM_LOOK_Y,
-    py + fy * CAM_LOOK + uy * CAM_LOOK_Y,
-    pz + fz * CAM_LOOK + uz * CAM_LOOK_Y,
-    ux,
-    uy,
-    uz
-  );
+  if (glued) {
+    surface(s - CAM_BACK, x * 0.2, CAM_HEIGHT + 1.4, camFr);
+    lookAt(
+      view,
+      camFr.x,
+      camFr.y,
+      camFr.z,
+      px + fx * 2 + ux * CAM_LOOK_Y,
+      py + fy * 2 + uy * CAM_LOOK_Y,
+      pz + fz * 2 + uz * CAM_LOOK_Y,
+      camFr.ux,
+      camFr.uy,
+      camFr.uz
+    );
+  } else {
+    lookAt(
+      view,
+      px - fx * CAM_BACK + ux * CAM_HEIGHT + sx * side,
+      py - fy * CAM_BACK + uy * CAM_HEIGHT + sy * side,
+      pz - fz * CAM_BACK + uz * CAM_HEIGHT + sz * side,
+      px + fx * CAM_LOOK + ux * CAM_LOOK_Y,
+      py + fy * CAM_LOOK + uy * CAM_LOOK_Y,
+      pz + fz * CAM_LOOK + uz * CAM_LOOK_Y,
+      ux,
+      uy,
+      uz
+    );
+  }
   beginFrame();
   drawStars(view);
   drawRoad(view);
