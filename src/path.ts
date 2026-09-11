@@ -95,6 +95,44 @@ function advance(len: number, ds: number): void {
   }
 }
 
+function bump(height: number, len: number): void {
+  const steps = Math.max(8, Math.round(len / (STEP * 0.65)));
+  const ds = len / steps;
+  const T0 = [T[0], T[1], T[2]];
+  const U0 = [U[0], U[1], U[2]];
+  const P0 = [P[0], P[1], P[2]];
+  for (let i = 1; i <= steps; i++) {
+    const t = i / steps;
+    const o = 1 - t;
+    // C2 at the flats so the pitch does not kick at the lip.
+    const y = height * 64 * t * t * t * o * o * o;
+    const dyds = (height * 192 * t * t * o * o * (1 - 2 * t)) / len;
+    const pitch = Math.atan(dyds);
+    P[0] = P0[0] + T0[0] * (ds * i);
+    P[1] = P0[1] + T0[1] * (ds * i) + y;
+    P[2] = P0[2] + T0[2] * (ds * i);
+    T[0] = T0[0];
+    T[1] = T0[1];
+    T[2] = T0[2];
+    U[0] = U0[0];
+    U[1] = U0[1];
+    U[2] = U0[2];
+    const N = [0, 0, 0];
+    cross(U0, T0, N);
+    norm(N);
+    rodrigues(T, N, pitch);
+    rodrigues(U, N, pitch);
+    dist += ds;
+    push();
+  }
+}
+
+function scurve(radius: number, sweep: number, mid: number): void {
+  yawArc(radius, sweep);
+  advance(mid, STEP);
+  yawArc(radius, -sweep);
+}
+
 function yawArc(radius: number, sweep: number): void {
   const sign = sweep > 0 ? 1 : -1;
   const R = Math.abs(radius);
@@ -207,31 +245,53 @@ function build(): void {
   dist = 0;
   push();
 
-  // Near-planar vertical loops (coaster shift-separation): exit sits beside entry.
-  const LONG = 100;
-  const SHORT = 32;
-  const CORNER = 88;
-  const TURN = Math.PI * 0.5;
+  const LEFT = Math.PI * 0.5;
+  const RIGHT = -Math.PI * 0.5;
   const LANE = -15;
-  const LOOP_R = 13.5;
+  const C1 = 64;
+  const C2 = 46;
+  const SHORT = 30;
+  const TAIL = 22;
   const LOOP_F = 2.8;
-  const LOOP_ADV = LOOP_F * Math.PI * 2;
-  const LOOP2_R = 10.5;
   const LOOP2_F = 2.2;
-  const LOOP2_ADV = LOOP2_F * Math.PI * 2;
+  const pre1 = 26 + 32 + 6 + LOOP_F * Math.PI * 2 + 12;
+  const pre2 = 18 + 30 + 8 + LOOP2_F * Math.PI * 2 + 10;
 
-  advance(44, STEP);
-  loop(LOOP_R, LOOP_F, LANE);
-  advance(LONG - 44 - LOOP_ADV, STEP);
-  yawArc(CORNER, TURN);
-  advance(SHORT, STEP);
-  yawArc(CORNER, TURN);
-  advance(28, STEP);
-  loop(LOOP2_R, LOOP2_F, LANE);
-  advance(LONG - 28 - LOOP2_ADV, STEP);
-  yawArc(CORNER, TURN);
-  advance(SHORT, STEP);
-  yawArc(CORNER, TURN);
+  advance(26, STEP);
+  bump(6.5, 32);
+  advance(6, STEP);
+  loop(13.5, LOOP_F, LANE);
+  advance(12, STEP);
+  scurve(36, 1.05, 8);
+  bump(3.6, 18);
+  advance(TAIL - 18, STEP);
+  yawArc(C1, LEFT);
+
+  advance(8, STEP);
+  yawArc(30, RIGHT);
+  advance(12, STEP);
+  yawArc(30, LEFT);
+  bump(3.2, 20);
+  advance(SHORT - 20, STEP);
+  yawArc(C2, LEFT);
+
+  advance(18, STEP);
+  bump(-5.5, 30);
+  advance(8, STEP);
+  loop(10.5, LOOP2_F, LANE);
+  advance(10, STEP);
+  scurve(36, 1.05, 8);
+  bump(3.8, 18);
+  advance(TAIL + pre1 - pre2 - 18, STEP);
+  yawArc(C1, LEFT);
+
+  advance(8, STEP);
+  yawArc(30, RIGHT);
+  advance(12, STEP);
+  yawArc(30, LEFT);
+  bump(-2.8, 20);
+  advance(SHORT - 20, STEP);
+  yawArc(C2, LEFT);
   closeToStart();
 
   trackLen = dist;

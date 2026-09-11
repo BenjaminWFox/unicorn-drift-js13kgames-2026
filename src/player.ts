@@ -122,7 +122,8 @@ function clampSlip(): void {
 }
 
 export function onRibbon(fr: Frame): boolean {
-  return Math.abs(fr.ty) > 0.08 || fr.uy < 0.82;
+  // Hills top out around 35°; only loops go vertical / invert.
+  return Math.abs(fr.ty) > 0.7 || fr.uy < 0.48;
 }
 
 export function resetPlayer(): void {

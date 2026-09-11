@@ -93,6 +93,10 @@ const camFr: Frame = {
   uy: 0,
   uz: 0,
 };
+const camEye = [0, 6, -10];
+const camAt = [0, 1, 8];
+const camUpS = [0, 1, 0];
+let camStick = 0;
 
 let last = 0;
 
@@ -118,7 +122,7 @@ function resize(): void {
   setViewSize(w, h);
 }
 
-function renderWorld(): void {
+function renderWorld(dt: number): void {
   if (scene === SCENE_TITLE) {
     idleTitle();
   } else {
@@ -142,34 +146,57 @@ function renderWorld(): void {
   const sy = onTitle ? right[1] : velR[1];
   const sz = onTitle ? right[2] : velR[2];
   const side = onTitle ? 3.2 : glued ? 0 : -slip * 2.6;
-  if (glued) {
-    surface(s - CAM_BACK, x * 0.2, CAM_HEIGHT + 1.4, camFr);
-    lookAt(
-      view,
-      camFr.x,
-      camFr.y,
-      camFr.z,
-      px + fx * 2 + ux * CAM_LOOK_Y,
-      py + fy * 2 + uy * CAM_LOOK_Y,
-      pz + fz * 2 + uz * CAM_LOOK_Y,
-      camFr.ux,
-      camFr.uy,
-      camFr.uz
-    );
-  } else {
-    lookAt(
-      view,
-      px - fx * CAM_BACK + ux * CAM_HEIGHT + sx * side,
-      py - fy * CAM_BACK + uy * CAM_HEIGHT + sy * side,
-      pz - fz * CAM_BACK + uz * CAM_HEIGHT + sz * side,
-      px + fx * CAM_LOOK + ux * CAM_LOOK_Y,
-      py + fy * CAM_LOOK + uy * CAM_LOOK_Y,
-      pz + fz * CAM_LOOK + uz * CAM_LOOK_Y,
-      ux,
-      uy,
-      uz
-    );
-  }
+  // Keep the chase cam mostly level on hills; only loops should roll with the ribbon.
+  const level = Math.max(0, Math.min(1, (uy - 0.32) / 0.58));
+  const keep = 1 - level * 0.82;
+  let cux = ux * keep;
+  let cuy = uy * keep + level * 0.82;
+  let cuz = uz * keep;
+  let cl = Math.hypot(cux, cuy, cuz) || 1;
+  cux /= cl;
+  cuy /= cl;
+  cuz /= cl;
+  let cfx = fx;
+  let cfy = fy * (1 - level * 0.78);
+  let cfz = fz;
+  cl = Math.hypot(cfx, cfy, cfz) || 1;
+  cfx /= cl;
+  cfy /= cl;
+  cfz /= cl;
+  const lookS = onTitle ? 8 : 15;
+  surface(s + lookS, onTitle ? x : x * 0.18, 1.35, camFr);
+  let fEx = px - cfx * CAM_BACK + cux * CAM_HEIGHT + sx * side;
+  let fEy = py - cfy * CAM_BACK + cuy * CAM_HEIGHT + sy * side;
+  let fEz = pz - cfz * CAM_BACK + cuz * CAM_HEIGHT + sz * side;
+  let fLx = falling > 0 ? px + fx * CAM_LOOK : camFr.x;
+  let fLy = falling > 0 ? py + CAM_LOOK_Y : camFr.y;
+  let fLz = falling > 0 ? pz + fz * CAM_LOOK : camFr.z;
+  surface(s - CAM_BACK, x * 0.2, CAM_HEIGHT + 1.4, camFr);
+  const want = !onTitle && falling <= 0 && glued ? 1 : 0;
+  camStick += (want - camStick) * (1 - Math.exp(-6.5 * dt));
+  const t = camStick * camStick * (3 - 2 * camStick);
+  const ex = fEx + (camFr.x - fEx) * t;
+  const ey = fEy + (camFr.y - fEy) * t;
+  const ez = fEz + (camFr.z - fEz) * t;
+  const lx = fLx + (px + fx * 2 + ux * CAM_LOOK_Y - fLx) * t;
+  const ly = fLy + (py + fy * 2 + uy * CAM_LOOK_Y - fLy) * t;
+  const lz = fLz + (pz + fz * 2 + uz * CAM_LOOK_Y - fLz) * t;
+  cux += (camFr.ux - cux) * t;
+  cuy += (camFr.uy - cuy) * t;
+  cuz += (camFr.uz - cuz) * t;
+  cl = Math.hypot(cux, cuy, cuz) || 1;
+  const jump = Math.hypot(ex - camEye[0], ey - camEye[1], ez - camEye[2]);
+  const k = jump > 28 ? 1 : 1 - Math.exp(-(onTitle ? 14 : 8.5) * dt);
+  camEye[0] += (ex - camEye[0]) * k;
+  camEye[1] += (ey - camEye[1]) * k;
+  camEye[2] += (ez - camEye[2]) * k;
+  camAt[0] += (lx - camAt[0]) * k;
+  camAt[1] += (ly - camAt[1]) * k;
+  camAt[2] += (lz - camAt[2]) * k;
+  camUpS[0] += (cux / cl - camUpS[0]) * k;
+  camUpS[1] += (cuy / cl - camUpS[1]) * k;
+  camUpS[2] += (cuz / cl - camUpS[2]) * k;
+  lookAt(view, camEye[0], camEye[1], camEye[2], camAt[0], camAt[1], camAt[2], camUpS[0], camUpS[1], camUpS[2]);
   beginFrame();
   drawStars(view);
   drawRoad(view);
@@ -239,7 +266,7 @@ function frame(now: number): void {
   } else {
     handleMenuKey();
   }
-  renderWorld();
+  renderWorld(dt);
   drawUi(ui);
   clearFrameInput();
   requestAnimationFrame(frame);
