@@ -1,3 +1,5 @@
+import { unlockAudio } from './audio';
+
 const down = new Set<string>();
 const pressed = new Set<string>();
 
@@ -16,6 +18,7 @@ export function initInput(canvas: HTMLCanvasElement): void {
     if (!e.repeat) {
       pressed.add(e.code);
     }
+    unlockAudio();
   });
   window.addEventListener('keyup', (e) => {
     down.delete(e.code);
@@ -24,6 +27,7 @@ export function initInput(canvas: HTMLCanvasElement): void {
   canvas.addEventListener('pointerdown', (e) => {
     tapX = e.clientX;
     tapY = e.clientY;
+    unlockAudio();
   });
   canvas.addEventListener(
     'touchstart',

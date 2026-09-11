@@ -1,3 +1,4 @@
+import { updateAudio } from './audio';
 import {
   CAM_BACK,
   CAM_HEIGHT,
@@ -9,13 +10,14 @@ import {
 } from './constants';
 import { ghostAt, ghostClock, hasGhost, recordTick, type Sample } from './ghost';
 import { beginFrame, initGl, resizeGl, setSky } from './gl';
-import { clearFrameInput, initInput, wasPressed } from './input';
+import { clearFrameInput, held, initInput, wasPressed } from './input';
 import { initLadder } from './ladder';
 import { lookAt, mat4 } from './math';
 import { surface, type Frame } from './path';
 import {
   countdown,
   falling,
+  finished,
   fwd,
   glued,
   ghostPose,
@@ -27,6 +29,8 @@ import {
   right,
   s,
   slip,
+  slideCharge,
+  speed,
   syncPose,
   up,
   updatePlayer,
@@ -266,6 +270,14 @@ function frame(now: number): void {
   } else {
     handleMenuKey();
   }
+  updateAudio(
+    dt,
+    speed,
+    held('ArrowUp') || held('KeyW') ? 1 : 0,
+    scene === SCENE_RUN && !finished ? 1 : 0,
+    countdown,
+    slideCharge
+  );
   renderWorld(dt);
   drawUi(ui);
   clearFrameInput();

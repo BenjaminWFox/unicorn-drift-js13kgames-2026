@@ -89,10 +89,21 @@ function buildRoad(): void {
 
 buildRoad();
 
-export function onBoostPad(ps: number, px: number): boolean {
+export function onBoostPad(ps: number, px: number, ang: number): boolean {
+  const c = Math.cos(ang);
+  const sn = Math.sin(ang);
   for (let i = 0; i < pads.length; i += 2) {
-    if (wrapS(ps - pads[i]) < PAD_LEN && Math.abs(px - pads[i + 1]) < PAD_HALF) {
-      return true;
+    const s0 = pads[i];
+    const xc = pads[i + 1];
+    for (let k = 0; k < 5; k++) {
+      const lx = k ? (k & 1 ? 0.35 : -0.35) : 0;
+      const lz = k ? (k < 3 ? 0.9 : -1.2) : 0;
+      if (
+        wrapS(ps + lz * c - lx * sn - s0) < PAD_LEN + 0.7 &&
+        Math.abs(px + lx * c + lz * sn - xc) < PAD_HALF + 0.12
+      ) {
+        return true;
+      }
     }
   }
   return false;

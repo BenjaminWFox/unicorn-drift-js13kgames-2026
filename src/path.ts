@@ -19,6 +19,7 @@ export type Frame = {
 const frames: Frame[] = [];
 export let trackLen = 1;
 export const pads: number[] = [];
+const loops: number[] = [];
 
 const STEP = 0.55;
 
@@ -152,6 +153,7 @@ function yawArc(radius: number, sweep: number): void {
 }
 
 function loop(R: number, F: number, lane: number): void {
+  const s0 = dist;
   const T0 = [T[0], T[1], T[2]];
   const U0 = [U[0], U[1], U[2]];
   const N0 = [0, 0, 0];
@@ -230,6 +232,7 @@ function loop(R: number, F: number, lane: number): void {
   U[1] = U0[1];
   U[2] = U0[2];
   P[1] = P0[1];
+  loops.push(s0, dist);
 }
 
 function markPad(back: number, lane: number): void {
@@ -249,6 +252,7 @@ function build(): void {
   U[2] = 0;
   dist = 0;
   pads.length = 0;
+  loops.length = 0;
   push();
 
   const LEFT = Math.PI * 0.5;
@@ -483,18 +487,15 @@ export function headingAxes(fr: Frame, yaw: number, F: number[], N: number[], Up
   norm(Up);
 }
 
-export function gateS(distAlong: number): number {
-  const along = wrapS(distAlong);
-  const q = trackLen * 0.25;
-  let g = 0;
-  if (along >= q * 3) {
-    g = q * 3;
-  } else if (along >= q * 2) {
-    g = q * 2;
-  } else if (along >= q) {
-    g = q;
+export function fallS(ps: number, steep: number): number {
+  const along = wrapS(ps);
+  const pad = steep ? 10 : 4;
+  for (let i = 0; i < loops.length; i += 2) {
+    if (along >= loops[i] - pad && along <= loops[i + 1] + pad) {
+      return wrapS(loops[i] - 5);
+    }
   }
-  return g;
+  return wrapS(along - 3);
 }
 
 export function sampleEvery(step: number): Frame[] {

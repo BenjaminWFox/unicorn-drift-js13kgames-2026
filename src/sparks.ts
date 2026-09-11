@@ -15,7 +15,7 @@ type Spark = {
 };
 
 const sparks: Spark[] = [];
-const MAX = 90;
+const MAX = 180;
 
 export function clearSparks(): void {
   sparks.length = 0;
@@ -62,6 +62,34 @@ export function burstSparks(
   }
 }
 
+export function burstPad(
+  x: number,
+  y: number,
+  z: number,
+  fwd: number[],
+  up: number[],
+  right: number[],
+  spd: number
+): void {
+  for (let i = 0; i < 56; i++) {
+    const side = (Math.random() - 0.5) * 3.2;
+    const along = Math.random() * 2.8;
+    const upV = 5 + Math.random() * 12;
+    const rush = spd * 0.92 + 4 + Math.random() * 10;
+    add(
+      x + right[0] * side + fwd[0] * along + up[0] * 0.35,
+      y + right[1] * side + fwd[1] * along + up[1] * 0.35,
+      z + right[2] * side + fwd[2] * along + up[2] * 0.35,
+      right[0] * side * 2.4 + fwd[0] * rush + up[0] * upV,
+      right[1] * side * 2.4 + fwd[1] * rush + up[1] * upV,
+      right[2] * side * 2.4 + fwd[2] * rush + up[2] * upV,
+      0.7 + Math.random() * 0.7,
+      (Math.random() * 3) | 0,
+      2
+    );
+  }
+}
+
 export function emitFlames(
   x: number,
   y: number,
@@ -99,11 +127,15 @@ export function updateSparks(dt: number): void {
     p.x += p.vx * dt;
     p.y += p.vy * dt;
     p.z += p.vz * dt;
-    if (p.k) {
+    if (p.k === 1) {
       p.vx *= 1 - 2.4 * dt;
       p.vz *= 1 - 2.4 * dt;
       p.vy += 22 * dt;
+    } else if (p.k === 2) {
+      p.vy -= 16 * dt;
     } else {
+      p.vx *= 1 - 0.8 * dt;
+      p.vz *= 1 - 0.8 * dt;
       p.vy -= 18 * dt;
     }
   }
@@ -114,6 +146,11 @@ const FLAME = [
   [1, 0.58, 0.08],
   [1, 0.28, 0.04],
 ];
+const PAD = [
+  [1, 0.86, 0.18],
+  [1, 0.96, 0.42],
+  [1, 0.74, 0.08],
+];
 
 export function drawSparks(view: Float32Array): void {
   if (!sparks.length) {
@@ -121,7 +158,12 @@ export function drawSparks(view: Float32Array): void {
   }
   setDepthWrite(false);
   for (const p of sparks) {
-    if (p.k) {
+    if (p.k === 2) {
+      const col = PAD[p.c];
+      setDrawAlpha(Math.min(1, p.life * 2.2));
+      const sc = 0.16 + p.life * 0.38;
+      drawOct(view, p.x, p.y, p.z, p.life * 5, p.life * 3.2, sc, sc, sc, col[0], col[1], col[2]);
+    } else if (p.k) {
       const col = FLAME[p.c];
       setDrawAlpha(Math.min(1, p.life * 5.5));
       const h = 0.28 + p.life * 1.1;

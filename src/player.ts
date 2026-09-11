@@ -27,9 +27,9 @@ import {
   STEER,
 } from './constants';
 import { held, wasPressed } from './input';
-import { frameAt, gateS, headingAxes, surface, tangentYaw, trackLen, type Frame } from './path';
+import { fallS, frameAt, headingAxes, surface, tangentYaw, trackLen, wrapS, type Frame } from './path';
 import { onBoostPad } from './road';
-import { burstSparks, clearSparks, emitFlames, updateSparks } from './sparks';
+import { burstPad, burstSparks, clearSparks, emitFlames, updateSparks } from './sparks';
 
 export let s = 0;
 export let x = 0;
@@ -45,6 +45,7 @@ let slideAge = 0;
 let exitBoost = 0;
 let padBoost = 0;
 let cling = 0;
+let fallSteep = 0;
 export let glued = 0;
 export let falling = 0;
 export let fallY = 0;
@@ -145,6 +146,7 @@ export function resetPlayer(): void {
   exitBoost = 0;
   padBoost = 0;
   cling = 0;
+  fallSteep = 0;
   falling = 0;
   fallY = 0;
   countdown = COUNTDOWN;
@@ -173,6 +175,7 @@ function steerInput(): number {
 
 function startFall(): void {
   falling = FALL_TIME;
+  fallSteep = glued;
   fallPos[0] = pose.x;
   fallPos[1] = pose.y;
   fallPos[2] = pose.z;
@@ -183,9 +186,9 @@ function startFall(): void {
 }
 
 function respawn(): void {
-  const gate = gateS(dist);
-  const lap = Math.floor(Math.max(0, dist) / trackLen);
-  s = gate + 0.5;
+  const oldS = wrapS(s);
+  const ns = fallS(oldS, fallSteep);
+  const back = wrapS(oldS - ns);
   x = 0;
   speed = 0;
   hop = 0;
@@ -197,7 +200,14 @@ function respawn(): void {
   padBoost = 0;
   cling = 0;
   falling = 0;
-  dist = lap * trackLen + s;
+  fallSteep = 0;
+  if (back < trackLen * 0.5 && dist >= back) {
+    dist -= back;
+    s = ns;
+  } else {
+    s = 0.4;
+    dist = 0.4;
+  }
   raceTime += PENALTY;
   facePath();
   syncPose();
@@ -345,10 +355,11 @@ export function updatePlayer(dt: number): void {
     boosting += SLIDE_EXIT_BOOST;
     emitFlames(pose.x, pose.y, pose.z, vel, up, velR, 3);
   }
-  if (hop < 0.45 && onBoostPad(s, x)) {
+  if (hop < 0.45 && onBoostPad(s, x, slip)) {
     if (padBoost <= 0) {
       speed += PAD_SPEED;
-      emitFlames(pose.x, pose.y, pose.z, vel, up, velR, 12);
+      burstPad(pose.x, pose.y, pose.z, vel, velU, velR, speed);
+      emitFlames(pose.x, pose.y, pose.z, vel, up, velR, 8);
     }
     padBoost = PAD_TIME;
   }

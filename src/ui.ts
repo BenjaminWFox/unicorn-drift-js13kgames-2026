@@ -1,3 +1,4 @@
+import { armCountdown, unlockAudio } from './audio';
 import { FONT, LAPS, RAINBOW, SLIDE_CHARGE } from './constants';
 import { packGhost, recorded, resetRecord, setPlayback } from './ghost';
 import { tapX, tapY, wasPressed } from './input';
@@ -39,6 +40,8 @@ export function setViewSize(w: number, h: number): void {
 }
 
 export function startRun(): void {
+  unlockAudio();
+  armCountdown();
   resetPlayer();
   resetRecord();
   scene = SCENE_RUN;
@@ -155,8 +158,6 @@ function drawSlideBar(ctx: CanvasRenderingContext2D): void {
   const h = 56;
   const x = cssW * 0.5 - w * 0.5;
   const y = cssH - 78;
-  const hot = slide > 0 && slideCharge >= 1;
-  const pulse = 0.55 + 0.45 * Math.abs(Math.sin(raceTime * 16));
   ctx.save();
   ctx.globalAlpha = slide > 0 ? 1 : Math.min(1, slideCharge * 3);
   ctx.fillStyle = 'rgba(0,0,0,0.72)';
@@ -185,9 +186,22 @@ function drawSlideBar(ctx: CanvasRenderingContext2D): void {
   ctx.fillRect(minX, y - 4, 4, h + 8);
   ctx.fillStyle = '#ffd24a';
   ctx.fillRect(x + w - 5, y - 4, 5, h + 8);
-  ctx.strokeStyle = hot ? '#ffd24a' : 'rgba(255,255,255,0.28)';
-  ctx.lineWidth = hot ? 3 + pulse : 2;
+  const g = slideCharge < 0.75 ? 0 : Math.min(1, 0.2 + 0.8 * ((slideCharge - 0.75) / 0.25));
+  const pulse = g >= 1 ? 0.62 + 0.38 * Math.abs(Math.sin(raceTime * 14)) : 1;
   roundRect(ctx, x - 8, y - 8, w + 16, h + 16, 12);
+  if (g) {
+    ctx.shadowColor = '#ffd24a';
+    ctx.shadowBlur = (10 + g * 34) * pulse;
+    ctx.strokeStyle = 'rgba(255,210,74,' + (0.3 + 0.7 * g) * pulse + ')';
+    ctx.lineWidth = 2.5 + g * 3.5 * pulse;
+    ctx.stroke();
+    ctx.shadowBlur = (22 + g * 48) * pulse;
+    ctx.lineWidth = 7 + g * 12 * pulse;
+    ctx.strokeStyle = 'rgba(255,210,74,' + (0.1 + 0.28 * g) * pulse + ')';
+  } else {
+    ctx.strokeStyle = 'rgba(255,255,255,0.28)';
+    ctx.lineWidth = 2;
+  }
   ctx.stroke();
   ctx.restore();
 }
