@@ -147,9 +147,9 @@ const FLAME = [
   [1, 0.28, 0.04],
 ];
 const PAD = [
-  [1, 0.86, 0.18],
-  [1, 0.96, 0.42],
-  [1, 0.74, 0.08],
+  [1, 0.4, 0.78],
+  [1, 0.62, 0.9],
+  [1, 0.22, 0.64],
 ];
 
 export function drawSparks(view: Float32Array): void {

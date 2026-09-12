@@ -114,7 +114,7 @@ export function drawRoad(view: Float32Array): void {
     const col = rgb(RAINBOW[b]);
     drawTris(view, bands[b], col[0], col[1], col[2]);
   }
-  drawTris(view, padMesh, 1, 0.86, 0.18);
+  drawTris(view, padMesh, 1, 0.4, 0.78);
   setDepthWrite(false);
   const t = performance.now() * 0.001;
   for (let i = 0; i < pads.length; i += 2) {
@@ -138,8 +138,8 @@ export function drawRoad(view: Float32Array): void {
         sc,
         sc,
         1,
-        0.84 + u * 0.12,
-        0.18
+        0.38 + u * 0.28,
+        0.74 + u * 0.16
       );
     }
   }
