@@ -17,6 +17,7 @@ import {
   GRIP_FOLLOW,
   SLIDE_BOOST,
   SLIDE_CHARGE,
+  SLIDE_DUMP,
   SLIDE_EXIT_BOOST,
   SLIDE_EXIT_KICK,
   SLIDE_HOOK,
@@ -317,6 +318,7 @@ export function updatePlayer(dt: number): void {
       if (slide <= 0) {
         heading += st * SLIDE_KICK;
         slideAge = 0;
+        slideCharge = 0;
       }
       slide = SLIDE_TIME;
     }
@@ -330,8 +332,11 @@ export function updatePlayer(dt: number): void {
   const wasSliding = slide > 0;
   if (slide > 0) {
     cling = 0.7;
+    const prevCharge = slideCharge;
     slideAge += dt;
-    slideCharge = Math.min(1, slideAge / SLIDE_CHARGE);
+    const over = slideAge - SLIDE_CHARGE;
+    slideCharge = over < 0 ? slideAge / SLIDE_CHARGE : Math.max(0, 1 - Math.max(0, over - 0.12) / SLIDE_DUMP);
+    speed += SLIDE_BOOST * (slideCharge - prevCharge);
     if (turningOut || !st || !held('Space')) {
       slide = 0;
     } else {
@@ -339,7 +344,7 @@ export function updatePlayer(dt: number): void {
       if (slide < 0) {
         slide = 0;
       }
-      boosting = SLIDE_BOOST;
+      boosting = SLIDE_BOOST * slideCharge;
       burstSparks(pose.x, pose.y, pose.z, vel, up, velR);
     }
   } else {
@@ -348,9 +353,9 @@ export function updatePlayer(dt: number): void {
     slideCharge = Math.max(0, slideCharge - dt * 3.6);
   }
   if (wasSliding && slide <= 0) {
-    if (slideAge > 0.2) {
-      const charge = Math.min(1, slideAge / SLIDE_CHARGE);
-      exitBoost = Math.min(2.5, 0.28 + slideAge * 0.85);
+    if (slideCharge > 0.2 / SLIDE_CHARGE) {
+      const charge = slideCharge;
+      exitBoost = 0.18 + charge * 0.55;
       speed += SLIDE_EXIT_KICK * charge;
       emitFlames(pose.x, pose.y, pose.z, vel, up, velR, 14);
     }

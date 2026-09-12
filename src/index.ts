@@ -9,7 +9,7 @@ import {
   SKY_R,
 } from './constants';
 import { ghostAt, ghostClock, hasGhost, recordTick, type Sample } from './ghost';
-import { beginFrame, initGl, resizeGl, setSky } from './gl';
+import { beginFrame, initGl, projectScreen, resizeGl, setSky } from './gl';
 import { clearFrameInput, held, initInput, wasPressed } from './input';
 import { initLadder } from './ladder';
 import { lookAt, mat4 } from './math';
@@ -54,6 +54,7 @@ import {
   SCENE_RUN,
   SCENE_TITLE,
   scene,
+  setGhostPlate,
   setViewSize,
   tickFinish,
 } from './ui';
@@ -82,6 +83,7 @@ const gF = [0, 0, 1];
 const gN = [1, 0, 0];
 const gU = [0, 1, 0];
 const gSamp: Sample = { t: 0, s: 0, x: 0, h: 0, p: 0 };
+const gScr = [0, 0];
 const camFr: Frame = {
   s: 0,
   x: 0,
@@ -149,7 +151,7 @@ function renderWorld(dt: number): void {
   const sx = onTitle ? right[0] : velR[0];
   const sy = onTitle ? right[1] : velR[1];
   const sz = onTitle ? right[2] : velR[2];
-  const side = onTitle ? -4.5 : glued ? 0 : -slip * 2.6;
+  const side = onTitle ? -5.8 : glued ? 0 : -slip * 2.6;
   // Keep the chase cam mostly level on hills; only loops should roll with the ribbon.
   const level = Math.max(0, Math.min(1, (uy - 0.32) / 0.58));
   const keep = 1 - level * 0.82;
@@ -169,8 +171,8 @@ function renderWorld(dt: number): void {
   cfz /= cl;
   const lookS = onTitle ? 8 : 15;
   surface(s + lookS, onTitle ? 2.4 : x * 0.18, 1.35, camFr);
-  const camBack = onTitle ? 11.2 : CAM_BACK;
-  const camH = onTitle ? 5.4 : CAM_HEIGHT;
+  const camBack = onTitle ? 13.2 : CAM_BACK;
+  const camH = onTitle ? 6.1 : CAM_HEIGHT;
   let fEx = px - cfx * camBack + cux * camH + sx * side;
   let fEy = py - cfy * camBack + cuy * camH + sy * side;
   let fEz = pz - cfz * camBack + cuz * camH + sz * side;
@@ -206,6 +208,7 @@ function renderWorld(dt: number): void {
   beginFrame();
   drawStars(view);
   drawRoad(view);
+  let plateOn = 0;
   if ((scene === SCENE_RUN || scene === SCENE_PAUSE) && hasGhost() && ghostAt(ghostClock(), gSamp)) {
     ghostPose(gSamp.s, gSamp.x, gSamp.h, gPose, gF, gN, gU, gSamp.p);
     drawUnicarn(
@@ -226,7 +229,14 @@ function renderWorld(dt: number): void {
       0,
       true
     );
+    const { w, h } = viewSize();
+    if (
+      projectScreen(view, gPose.x + gU[0] * 2.35, gPose.y + gU[1] * 2.35, gPose.z + gU[2] * 2.35, w, h, gScr)
+    ) {
+      plateOn = 1;
+    }
   }
+  setGhostPlate(gScr[0], gScr[1], plateOn);
   drawUnicarn(
     view,
     pose.x,

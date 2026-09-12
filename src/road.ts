@@ -1,10 +1,11 @@
 import { BANDS, PAD_HALF, PAD_LEN, RAINBOW, ROAD_HALF } from './constants';
-import { drawBoxX, drawOct, drawTris, setDepthWrite, setDrawAlpha } from './gl';
+import { drawBoxX, drawOct, drawTris, setDepthBias, setDepthWrite, setDrawAlpha } from './gl';
 import { rgb } from './math';
 import { frameAt, pads, sampleEvery, troughY, wrapS, type Frame } from './path';
 
 const bands: number[][] = [];
 const padMesh: number[] = [];
+const chevMesh: number[] = [];
 const post = {
   s: 0,
   x: 0,
@@ -35,6 +36,10 @@ const padFr: Frame = {
   uy: 0,
   uz: 0,
 };
+const a = [0, 0, 0];
+const c = [0, 0, 0];
+const d = [0, 0, 0];
+const e = [0, 0, 0];
 
 function rim(fr: Frame, x: number, lift: number, out: number[]): void {
   const h = troughY(x) + lift;
@@ -43,16 +48,24 @@ function rim(fr: Frame, x: number, lift: number, out: number[]): void {
   out[2] = fr.z + fr.nz * x + fr.uz * h;
 }
 
+function chevArm(xb: number, xi: number, xc: number, sb: number, st: number, sti: number): void {
+  frameAt(sb, post);
+  rim(post, xb, 0.28, a);
+  rim(post, xi, 0.28, e);
+  frameAt(st, padFr);
+  rim(padFr, xc, 0.28, c);
+  frameAt(sti, padFr);
+  rim(padFr, xc, 0.28, d);
+  chevMesh.push(a[0], a[1], a[2], c[0], c[1], c[2], d[0], d[1], d[2]);
+  chevMesh.push(a[0], a[1], a[2], d[0], d[1], d[2], e[0], e[1], e[2]);
+}
+
 function buildRoad(): void {
   const samples = sampleEvery(1.05);
   samples.push(samples[0]);
   for (let b = 0; b < BANDS; b++) {
     bands[b] = [];
   }
-  const a = [0, 0, 0];
-  const c = [0, 0, 0];
-  const d = [0, 0, 0];
-  const e = [0, 0, 0];
   for (let i = 0; i < samples.length - 1; i++) {
     const f0 = samples[i];
     const f1 = samples[i + 1];
@@ -83,6 +96,13 @@ function buildRoad(): void {
       rim(padFr, x0, 0.08, e);
       padMesh.push(a[0], a[1], a[2], c[0], c[1], c[2], d[0], d[1], d[2]);
       padMesh.push(a[0], a[1], a[2], d[0], d[1], d[2], e[0], e[1], e[2]);
+    }
+    const w = PAD_HALF * 0.86;
+    for (let k = 0; k < 3; k++) {
+      const sb = s0 + 1.2 + k * 3.4;
+      const st = sb + 2.5;
+      chevArm(xc - w, xc - w * 0.32, xc, sb, st, st - 0.95);
+      chevArm(xc + w, xc + w * 0.32, xc, sb, st, st - 0.95);
     }
   }
 }
@@ -115,6 +135,9 @@ export function drawRoad(view: Float32Array): void {
     drawTris(view, bands[b], col[0], col[1], col[2]);
   }
   drawTris(view, padMesh, 1, 0.4, 0.78);
+  setDepthBias(1);
+  drawTris(view, chevMesh, 0.86, 0.18, 0.58);
+  setDepthBias(0);
   setDepthWrite(false);
   const t = performance.now() * 0.001;
   for (let i = 0; i < pads.length; i += 2) {

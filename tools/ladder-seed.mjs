@@ -161,20 +161,35 @@ function merge(incoming, ghost) {
   return JSON.stringify({ r: pack(ranked()), g: topGhost }) !== before;
 }
 
-function payload() {
-  const body = { r: pack(ranked()), g: topGhost };
-  return JSON.stringify(body);
+function scorePayload() {
+  return JSON.stringify({ r: pack(ranked()) });
+}
+
+function ghostPayload() {
+  if (!topGhost) {
+    return '';
+  }
+  const top = ranked().find((r) => r.i === topGhost.i) || {
+    i: topGhost.i,
+    n: topGhost.n,
+    s: topGhost.t,
+    t: Date.now(),
+  };
+  const text = JSON.stringify({ r: pack([top]), g: topGhost });
+  return text.length <= MAX_MSG ? text : '';
 }
 
 function send() {
   if (sock?.readyState !== 1) {
     return;
   }
-  const text = payload();
-  if (text.length > MAX_MSG) {
-    return;
+  if (rows.length) {
+    sock.send(scorePayload());
   }
-  sock.send(text);
+  const ghost = ghostPayload();
+  if (ghost) {
+    sock.send(ghost);
+  }
 }
 
 function pulse() {

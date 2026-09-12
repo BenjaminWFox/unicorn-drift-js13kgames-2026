@@ -2,7 +2,7 @@ import { armCountdown, unlockAudio } from './audio';
 import { FONT, LAPS, RAINBOW, SLIDE_CHARGE } from './constants';
 import { packGhost, recorded, resetRecord, setPlayback } from './ghost';
 import { tapX, tapY, wasPressed } from './input';
-import { boardRows, formatTime, publishName, publishScore } from './ladder';
+import { boardRows, formatTime, ghostLabel, publishName, publishScore } from './ladder';
 import { rgb } from './math';
 import {
   countdown,
@@ -33,7 +33,14 @@ let finishFocusAt = 0;
 type Btn = { x: number; y: number; w: number; h: number; label: string; id: number };
 const btns: Btn[] = [];
 const nameBox = { x: 0, y: 0, w: 0, h: 0 };
+const ghostPlate = { x: 0, y: 0, on: 0 };
 let nameField: HTMLInputElement | undefined;
+
+export function setGhostPlate(x: number, y: number, on: number): void {
+  ghostPlate.x = x;
+  ghostPlate.y = y;
+  ghostPlate.on = on;
+}
 
 export function setViewSize(w: number, h: number): void {
   cssW = w;
@@ -368,7 +375,7 @@ export function drawUi(ctx: CanvasRenderingContext2D): void {
   const bw = Math.min(280, cssW * 0.7);
 
   if (scene === SCENE_TITLE) {
-    rainbowTitle(ctx, 'UniCARn', cssH * 0.11, Math.min(72, cssW * 0.14));
+    rainbowTitle(ctx, 'UNICORN DRIFT', cssH * 0.11, Math.min(56, cssW * 0.085));
     plate(ctx, 'BEST  ' + formatTime(best), mid, cssH * 0.22, 28, 'center', '#ffd24a');
     const startY = cssH - 176;
     addBtn(mid - bw * 0.5, startY, bw, 52, 'START', 0);
@@ -384,7 +391,7 @@ export function drawUi(ctx: CanvasRenderingContext2D): void {
   }
 
   if (scene === SCENE_SCORES) {
-    rainbowTitle(ctx, 'UniCARn', cssH * 0.12, 42);
+    rainbowTitle(ctx, 'UNICORN DRIFT', cssH * 0.12, Math.min(36, cssW * 0.07));
     nameBox.x = mid - 210;
     nameBox.y = cssH * 0.22;
     nameBox.w = 260;
@@ -403,6 +410,9 @@ export function drawUi(ctx: CanvasRenderingContext2D): void {
     plate(ctx, formatTime((raceTime * 1000) | 0), mid, 28, 22, 'center');
     plate(ctx, 'LAP  ' + currentLap() + '/' + LAPS, 70, 28, 16, 'left');
     plate(ctx, 'BEST  ' + formatTime(best), cssW - 24, 28, 16, 'right', '#ffd24a');
+    if (ghostPlate.on) {
+      plate(ctx, ghostLabel(), ghostPlate.x, ghostPlate.y, 14, 'center');
+    }
     drawSlideBar(ctx);
     if (countdown > 0) {
       const n = Math.ceil(countdown);

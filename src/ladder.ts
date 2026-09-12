@@ -4,6 +4,7 @@ import { best, localGhost, NAME_MAX, playerId, playerLabel, playerName } from '.
 const KEY = 'uc26L';
 const CAP = 12;
 const MAX_SCORE = 1e6;
+const MAX_MSG = 4000;
 const PULSE_MS = 3000;
 const WS_URL = 'wss://relay.js13kgames.com/unicarn';
 export const SEED_NAME = 'UNICARN-RELAY';
@@ -30,6 +31,13 @@ export function boardRows(limit: number): { n: string; s: number; self: boolean 
   return ranked()
     .slice(0, limit)
     .map((r) => ({ n: r.n, s: r.s, self: r.i === playerId }));
+}
+
+export function ghostLabel(): string {
+  if (localGhost && (!topGhost || topGhost.i === playerId)) {
+    return playerLabel();
+  }
+  return topGhost?.n || playerLabel();
 }
 
 export function publishScore(ghost: string): void {
@@ -73,9 +81,7 @@ function syncPulse(): void {
 }
 
 function pulse(): void {
-  if (sock && sock.readyState === 1 && (rows.length || topGhost)) {
-    sock.send(payload());
-  }
+  emit();
 }
 
 function loadBoard(): void {
@@ -216,21 +222,39 @@ function merge(incoming: Row[], ghost: GhostBlob | undefined): boolean {
   return JSON.stringify({ r: pack(ranked()), g: topGhost }) !== before;
 }
 
-function payload(): string {
+function boardList(): Row[] {
   const list = ranked().slice(0, CAP);
   if (best > 0 && !seeding() && !list.some((r) => r.i === playerId)) {
     list.push({ i: playerId, n: playerLabel(), s: best, t: Date.now() });
   }
-  const body: { r: [string, string, number, number][]; g?: GhostBlob } = { r: pack(list) };
-  if (topGhost) {
-    body.g = topGhost;
+  return list;
+}
+
+function scorePayload(): string {
+  return JSON.stringify({ r: pack(boardList()) });
+}
+
+function ghostPayload(): string {
+  const g = topGhost;
+  if (!g) {
+    return '';
   }
-  let text = JSON.stringify(body);
-  if (text.length > 3900 && body.g) {
-    body.r = body.r.slice(0, 6);
-    text = JSON.stringify(body);
+  const top = boardList().find((r) => r.i === g.i) || { i: g.i, n: g.n, s: g.t, t: Date.now() };
+  const text = JSON.stringify({ r: pack([top]), g });
+  return text.length <= MAX_MSG ? text : '';
+}
+
+function emit(): void {
+  if (!sock || sock.readyState !== 1) {
+    return;
   }
-  return text;
+  if (best > 0 || rows.length) {
+    sock.send(scorePayload());
+  }
+  const ghost = ghostPayload();
+  if (ghost) {
+    sock.send(ghost);
+  }
 }
 
 function scheduleSend(): void {
@@ -241,14 +265,12 @@ function scheduleSend(): void {
   sendTimer = setTimeout(() => {
     sendTimer = 0;
     sendAt = Date.now();
-    if (sock && sock.readyState === 1 && (best > 0 || rows.length || topGhost)) {
-      sock.send(payload());
-    }
+    emit();
   }, wait);
 }
 
 function onMessage(data: string): void {
-  if (data.length > 4000) {
+  if (data.length > MAX_MSG) {
     return;
   }
   try {

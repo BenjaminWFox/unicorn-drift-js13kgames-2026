@@ -129,6 +129,15 @@ export function setDepthWrite(on: boolean): void {
   gl.depthMask(on);
 }
 
+export function setDepthBias(on: number): void {
+  if (on) {
+    gl.enable(gl.POLYGON_OFFSET_FILL);
+    gl.polygonOffset(-8, -24);
+  } else {
+    gl.disable(gl.POLYGON_OFFSET_FILL);
+  }
+}
+
 export function resizeGl(w: number, h: number): void {
   gl.viewport(0, 0, w, h);
   perspective(proj, CAM_FOV, w / Math.max(h, 1), 0.25, 420);
@@ -143,14 +152,18 @@ export function projectScreen(
   cssW: number,
   cssH: number,
   out: number[]
-): void {
+): boolean {
   mul(tmp, proj, view);
   const cx = tmp[0] * x + tmp[4] * y + tmp[8] * z + tmp[12];
   const cy = tmp[1] * x + tmp[5] * y + tmp[9] * z + tmp[13];
   const cw = tmp[3] * x + tmp[7] * y + tmp[11] * z + tmp[15];
+  if (cw <= 0.2) {
+    return false;
+  }
   const inv = 1 / cw;
   out[0] = (cx * inv * 0.5 + 0.5) * cssW;
   out[1] = (0.5 - cy * inv * 0.5) * cssH;
+  return out[0] > -80 && out[0] < cssW + 80 && out[1] > -40 && out[1] < cssH + 40;
 }
 
 export function setSky(r: number, g: number, b: number): void {
